@@ -312,6 +312,11 @@ extension HookEvent {
     nonisolated var intervention: SessionIntervention? {
         if let bridgeIntervention,
            !isAskUserQuestionRequest {
+            if provider == .codex,
+               event == "PermissionRequest",
+               expectsResponse {
+                return codexHookPermissionIntervention(from: bridgeIntervention)
+            }
             return bridgeIntervention
         }
 
@@ -325,10 +330,16 @@ extension HookEvent {
             if let tool {
                 metadata["toolName"] = tool
             }
+            if let toolUseId {
+                metadata["toolUseId"] = toolUseId
+                metadata["tool_use_id"] = toolUseId
+                metadata["originalToolUseId"] = toolUseId
+            }
             if let toolInputJSONObject,
                let data = try? JSONSerialization.data(withJSONObject: toolInputJSONObject, options: [.sortedKeys]),
                let json = String(data: data, encoding: .utf8) {
                 metadata["toolInputJSON"] = json
+                metadata["tool_input_json"] = json
             }
 
             return SessionIntervention(
@@ -448,6 +459,60 @@ extension HookEvent {
             supportsSessionScope: false,
             metadata: metadata
         )
+    }
+
+    private nonisolated func codexHookPermissionIntervention(
+        from bridgeIntervention: SessionIntervention
+    ) -> SessionIntervention {
+        var metadata = bridgeIntervention.metadata
+        metadata["source"] = "codex_hook_permission"
+        if let tool {
+            metadata["toolName"] = metadata["toolName"] ?? tool
+            metadata["tool_name"] = metadata["tool_name"] ?? tool
+        }
+        if let toolUseId {
+            metadata["toolUseId"] = toolUseId
+            metadata["tool_use_id"] = toolUseId
+            metadata["originalToolUseId"] = toolUseId
+        }
+        if let toolInputJSONObject,
+           let data = try? JSONSerialization.data(withJSONObject: toolInputJSONObject, options: [.sortedKeys]),
+           let json = String(data: data, encoding: .utf8) {
+            metadata["toolInputJSON"] = json
+            metadata["tool_input_json"] = json
+        }
+
+        return SessionIntervention(
+            id: bridgeIntervention.id,
+            kind: bridgeIntervention.kind,
+            title: bridgeIntervention.title,
+            message: codexHookPermissionInterventionMessage(from: bridgeIntervention),
+            options: bridgeIntervention.options,
+            questions: bridgeIntervention.questions,
+            supportsSessionScope: bridgeIntervention.supportsSessionScope,
+            metadata: metadata
+        )
+    }
+
+    private nonisolated func codexHookPermissionInterventionMessage(
+        from bridgeIntervention: SessionIntervention
+    ) -> String {
+        let eventMessage = codexApprovalInterventionMessage
+        let bridgeMessage = SessionTextSanitizer.sanitizedDisplayText(bridgeIntervention.message) ?? ""
+        guard !bridgeMessage.isEmpty else { return eventMessage }
+
+        let normalizedBridgeMessage = bridgeMessage
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let normalizedTool = SessionTextSanitizer.sanitizedDisplayText(tool)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+
+        if let normalizedTool, normalizedBridgeMessage == normalizedTool {
+            return eventMessage
+        }
+
+        return bridgeMessage
     }
 
     private nonisolated var isCodeBuddyCLIPermissionPromptNotification: Bool {

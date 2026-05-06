@@ -2722,7 +2722,9 @@ actor SessionStore {
             session.intervention = intervention
         }
         if shouldPreserveExternalIntervention {
-            if !session.phase.needsAttention {
+            if let hookPermissionPhase = restoredCodexHookPermissionPhase(from: session.intervention) {
+                session.phase = hookPermissionPhase
+            } else if !session.phase.needsAttention {
                 session.phase = phase
             }
         } else if shouldPreserveActivePhaseDuringApparentIdle(
@@ -2878,7 +2880,9 @@ actor SessionStore {
             session.intervention = snapshot.intervention
         }
         if shouldPreserveExternalIntervention {
-            if !session.phase.needsAttention {
+            if let hookPermissionPhase = restoredCodexHookPermissionPhase(from: session.intervention) {
+                session.phase = hookPermissionPhase
+            } else if !session.phase.needsAttention {
                 session.phase = snapshot.phase
             }
         } else if shouldPreserveActivePhaseDuringApparentIdle(
@@ -2980,11 +2984,29 @@ actor SessionStore {
 
     private func shouldPreserveCodexHookPermissionIngress(session: SessionState) -> Bool {
         guard session.provider == .codex,
-              session.intervention?.metadata["source"] == "codex_hook_permission",
-              session.phase.needsAttention else {
+              session.intervention?.metadata["source"] == "codex_hook_permission" else {
             return false
         }
         return true
+    }
+
+    private func restoredCodexHookPermissionPhase(from intervention: SessionIntervention?) -> SessionPhase? {
+        guard let intervention,
+              intervention.kind == .approval,
+              intervention.metadata["source"] == "codex_hook_permission" else {
+            return nil
+        }
+
+        let toolUseId = pendingHookResponseToolUseId(for: intervention) ?? intervention.id
+        let toolName = intervention.metadata["toolName"]
+            ?? intervention.metadata["tool_name"]
+            ?? intervention.title
+        return .waitingForApproval(PermissionContext(
+            toolUseId: toolUseId,
+            toolName: toolName,
+            toolInput: nil,
+            receivedAt: Date()
+        ))
     }
 
     private func shouldPreserveActivePhaseFromStaleCodexRefresh(

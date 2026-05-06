@@ -284,6 +284,130 @@ final class SessionStoreCodexInterventionTests: XCTestCase {
         await store.process(.sessionArchived(sessionId: sessionId))
     }
 
+    func testCodexHookPermissionInterventionRestoresApprovalPhaseDuringAppServerRefresh() async {
+        let sessionId = "codex-hook-degraded-\(UUID().uuidString)"
+        let store = SessionStore.shared
+        let intervention = SessionIntervention(
+            id: "call-date-degraded",
+            kind: .approval,
+            title: "Approve Command",
+            message: "date",
+            options: [],
+            questions: [],
+            supportsSessionScope: false,
+            metadata: [
+                "source": "codex_hook_permission",
+                "toolName": "Bash"
+            ]
+        )
+
+        await store.upsertCodexSession(
+            sessionId: sessionId,
+            name: "Codex",
+            preview: "Run date",
+            cwd: "/tmp/project",
+            phase: .processing,
+            intervention: intervention,
+            clientInfo: SessionClientInfo.codexApp(threadId: sessionId)
+        )
+
+        await store.upsertCodexSession(
+            sessionId: sessionId,
+            name: "Codex",
+            preview: "Run date",
+            cwd: "/tmp/project",
+            phase: .processing,
+            intervention: nil,
+            clientInfo: SessionClientInfo.codexApp(threadId: sessionId),
+            activityAt: Date().addingTimeInterval(5)
+        )
+
+        let session = await store.session(for: sessionId)
+        XCTAssertTrue(session?.phase.isWaitingForApproval == true)
+        XCTAssertEqual(session?.activePermission?.toolUseId, "call-date-degraded")
+        XCTAssertEqual(session?.activePermission?.toolName, "Bash")
+        XCTAssertEqual(session?.intervention?.metadata["source"], "codex_hook_permission")
+        XCTAssertEqual(session?.ingress, .hookBridge)
+        XCTAssertTrue(session?.needsApprovalResponse ?? false)
+
+        await store.process(.sessionArchived(sessionId: sessionId))
+    }
+
+    func testCodexBridgePermissionInterventionKeepsResolvedToolUseIdAcrossRefresh() async {
+        let sessionId = "codex-bridge-approval-\(UUID().uuidString)"
+        let store = SessionStore.shared
+        let bridgeIntervention = SessionIntervention(
+            id: "bridge-intervention-id",
+            kind: .approval,
+            title: "Codex needs approval",
+            message: "Bash",
+            options: [
+                SessionInterventionOption(id: "approve", title: "Allow Once", detail: nil),
+                SessionInterventionOption(id: "approveForSession", title: "Allow for Session", detail: nil),
+                SessionInterventionOption(id: "deny", title: "Deny", detail: nil)
+            ],
+            questions: [],
+            supportsSessionScope: false,
+            metadata: [:]
+        )
+
+        await store.process(.hookReceived(HookEvent(
+            sessionId: sessionId,
+            cwd: "/tmp/project",
+            event: "PermissionRequest",
+            status: "waiting_for_approval",
+            provider: .codex,
+            clientInfo: SessionClientInfo.codexApp(threadId: sessionId),
+            pid: nil,
+            tty: nil,
+            tool: "Bash",
+            toolInput: [
+                "command": AnyCodable("open ."),
+                "description": AnyCodable("Open the project in Finder.")
+            ],
+            toolUseId: "call-open-project",
+            notificationType: nil,
+            message: nil,
+            bridgeIntervention: bridgeIntervention
+        )))
+
+        var session = await store.session(for: sessionId)
+        XCTAssertEqual(session?.intervention?.id, "bridge-intervention-id")
+        XCTAssertEqual(session?.intervention?.message, "open .")
+        XCTAssertEqual(session?.intervention?.metadata["source"], "codex_hook_permission")
+        XCTAssertEqual(session?.intervention?.metadata["toolUseId"], "call-open-project")
+        XCTAssertEqual(session?.intervention?.metadata["tool_input_json"]?.contains("\"command\":\"open .\""), true)
+
+        await store.upsertCodexSession(
+            sessionId: sessionId,
+            name: "Codex",
+            preview: "Open project",
+            cwd: "/tmp/project",
+            phase: .processing,
+            intervention: nil,
+            clientInfo: SessionClientInfo.codexApp(threadId: sessionId),
+            activityAt: Date().addingTimeInterval(5)
+        )
+
+        session = await store.session(for: sessionId)
+        XCTAssertTrue(session?.phase.isWaitingForApproval == true)
+        XCTAssertEqual(session?.activePermission?.toolUseId, "call-open-project")
+        XCTAssertEqual(session?.activePermission?.toolName, "Bash")
+        XCTAssertEqual(session?.intervention?.id, "bridge-intervention-id")
+        XCTAssertEqual(session?.intervention?.message, "open .")
+        XCTAssertEqual(session?.intervention?.metadata["source"], "codex_hook_permission")
+        XCTAssertEqual(session?.ingress, .hookBridge)
+
+        await store.process(.permissionApproved(sessionId: sessionId, toolUseId: "call-open-project"))
+
+        session = await store.session(for: sessionId)
+        XCTAssertNil(session?.intervention)
+        XCTAssertEqual(session?.phase, .processing)
+        XCTAssertFalse(session?.needsApprovalResponse ?? true)
+
+        await store.process(.sessionArchived(sessionId: sessionId))
+    }
+
     func testCodexHookPermissionApprovalClearsInterventionImmediately() async {
         let sessionId = "codex-hook-approved-\(UUID().uuidString)"
         let store = SessionStore.shared
