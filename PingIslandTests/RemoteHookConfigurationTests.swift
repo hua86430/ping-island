@@ -27,6 +27,13 @@ final class RemoteHookConfigurationTests: XCTestCase {
         XCTAssertTrue(command.contains("chmod 755 '/root/.ping-island/bin/PingIslandBridge' '/root/.ping-island/bin/ping-island-bridge'"))
     }
 
+    func testRemoteBridgeLauncherOnlyUsesCompatLoaderForDynamicGlibcBridge() {
+        let script = RemoteConnectorManager.remoteBridgeLauncherScript()
+
+        XCTAssertTrue(script.contains("ldd \"$SCRIPT_DIR/PingIslandBridge\" 2>&1 | grep -q 'libc\\.so'"))
+        XCTAssertTrue(script.contains("exec \"$SCRIPT_DIR/PingIslandBridge\" \"$@\""))
+    }
+
     func testRemoteEnsureAgentRunningCommandReplacesStaleSocketStateBeforeRestart() {
         let command = RemoteConnectorManager.remoteEnsureAgentRunningCommand(
             installRoot: "/root/.ping-island",
@@ -73,19 +80,19 @@ final class RemoteHookConfigurationTests: XCTestCase {
         )
         XCTAssertEqual(
             RemoteConnectorManager.remoteLinuxBridgeBinaryAssetName(normalizedArchitecture: "x86_64"),
-            "PingIslandBridge-linux-x86_64"
+            "PingIslandBridge-linux-musl-x86_64"
         )
         XCTAssertEqual(
             RemoteConnectorManager.remoteLinuxBridgeArchiveAssetName(normalizedArchitecture: "x86_64"),
-            "PingIslandBridge-linux-x86_64.zip"
+            "PingIslandBridge-linux-musl-x86_64.zip"
         )
         XCTAssertEqual(
             RemoteConnectorManager.remoteLinuxBridgeBinaryAssetName(normalizedArchitecture: "aarch64"),
-            "PingIslandBridge-linux-aarch64"
+            "PingIslandBridge-linux-musl-aarch64"
         )
         XCTAssertEqual(
             RemoteConnectorManager.remoteLinuxBridgeArchiveAssetName(normalizedArchitecture: "aarch64"),
-            "PingIslandBridge-linux-aarch64.zip"
+            "PingIslandBridge-linux-musl-aarch64.zip"
         )
     }
 

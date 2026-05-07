@@ -624,20 +624,11 @@ final class RemoteConnectorManager: ObservableObject {
             "Remote bootstrap copied staged bridge endpoint=\(endpoint.id.uuidString, privacy: .public) remotePath=\(stagedBridgePath, privacy: .public)"
         )
 
-        let launcherScript = """
-        #!/bin/sh
-        SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-        COMPAT_LIB="$SCRIPT_DIR/../lib"
-        if [ -x "$COMPAT_LIB/ld-linux-x86-64.so.2" ]; then
-          exec "$COMPAT_LIB/ld-linux-x86-64.so.2" --library-path "$COMPAT_LIB" "$SCRIPT_DIR/PingIslandBridge" "$@"
-        fi
-        exec "$SCRIPT_DIR/PingIslandBridge" "$@"
-        """
         try await RemoteSSHCommandRunner.writeRemoteFile(
             target: endpoint.sshTarget,
             port: endpoint.sshPort,
             remotePath: "\(endpoint.remoteInstallRoot)/bin/ping-island-bridge",
-            contents: launcherScript.data(using: .utf8) ?? Data(),
+            contents: Self.remoteBridgeLauncherScript().data(using: .utf8) ?? Data(),
             password: password
         )
         _ = try await RemoteSSHCommandRunner.runSSH(
@@ -1024,7 +1015,7 @@ final class RemoteConnectorManager: ObservableObject {
     }
 
     nonisolated static func remoteLinuxBridgeBinaryAssetName(normalizedArchitecture: String) -> String {
-        "PingIslandBridge-linux-\(normalizedArchitecture)"
+        "PingIslandBridge-linux-musl-\(normalizedArchitecture)"
     }
 
     nonisolated static func remoteLinuxBridgeArchiveAssetName(normalizedArchitecture: String) -> String {
@@ -1274,6 +1265,18 @@ final class RemoteConnectorManager: ObservableObject {
         """
         mv -f \(shellQuote(stagedBridgePath)) \(shellQuote("\(installRoot)/bin/PingIslandBridge"))
         chmod 755 \(shellQuote("\(installRoot)/bin/PingIslandBridge")) \(shellQuote("\(installRoot)/bin/ping-island-bridge"))
+        """
+    }
+
+    nonisolated static func remoteBridgeLauncherScript() -> String {
+        """
+        #!/bin/sh
+        SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+        COMPAT_LIB="$SCRIPT_DIR/../lib"
+        if [ -x "$COMPAT_LIB/ld-linux-x86-64.so.2" ] && ldd "$SCRIPT_DIR/PingIslandBridge" 2>&1 | grep -q 'libc\\.so'; then
+          exec "$COMPAT_LIB/ld-linux-x86-64.so.2" --library-path "$COMPAT_LIB" "$SCRIPT_DIR/PingIslandBridge" "$@"
+        fi
+        exec "$SCRIPT_DIR/PingIslandBridge" "$@"
         """
     }
 

@@ -32,7 +32,7 @@ jobs:
   linux-bridge:
     name: Build Linux remote bridge
     runs-on: ${{ matrix.runner }}
-    container: swift:6.1-jammy
+    container: swift:6.1.3-jammy
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -40,8 +40,10 @@ jobs:
         include:
           - runner: ubuntu-24.04
             artifact_arch: x86_64
+            swift_sdk: x86_64-swift-linux-musl
           - runner: ubuntu-24.04-arm
             artifact_arch: aarch64
+            swift_sdk: aarch64-swift-linux-musl
 
     steps:
       - name: Checkout tagged source
@@ -55,17 +57,26 @@ jobs:
         run: |
           set -euo pipefail
 
-          swift build --package-path Prototype -c release --static-swift-stdlib --product PingIslandBridge
+          static_sdk_url="https://download.swift.org/swift-6.1.3-release/static-sdk/swift-6.1.3-RELEASE/swift-6.1.3-RELEASE_static-linux-0.0.1.artifactbundle.tar.gz"
+          static_sdk_checksum="7a741da46ce64cdbd6dd504a2617b211b88e7f66a9ada7ea4e55bcc9c06ff2b2"
+          swift sdk install "$static_sdk_url" --checksum "$static_sdk_checksum"
 
-          if ldd Prototype/.build/release/PingIslandBridge | grep -q 'libswift'; then
-            echo "::error::Linux PingIslandBridge still depends on Swift runtime shared libraries"
-            ldd Prototype/.build/release/PingIslandBridge
+          swift build --package-path Prototype -c release --swift-sdk "${{ matrix.swift_sdk }}" --product PingIslandBridge
+
+          bridge_path="Prototype/.build/${{ matrix.swift_sdk }}/release/PingIslandBridge"
+          if command -v file >/dev/null 2>&1; then
+            file "$bridge_path"
+          fi
+          ldd_output="$(ldd "$bridge_path" 2>&1 || true)"
+          printf '%s\n' "$ldd_output"
+          if printf '%s\n' "$ldd_output" | grep -Eq 'libswift|libc\.so|ld-linux|GLIBC_'; then
+            echo "::error::Linux PingIslandBridge must be a musl static executable without glibc or Swift shared-library dependencies"
             exit 1
           fi
 
           mkdir -p releases/unsigned
-          bridge_name="PingIslandBridge-linux-${{ matrix.artifact_arch }}"
-          cp Prototype/.build/release/PingIslandBridge "releases/unsigned/$bridge_name"
+          bridge_name="PingIslandBridge-linux-musl-${{ matrix.artifact_arch }}"
+          cp "$bridge_path" "releases/unsigned/$bridge_name"
           chmod +x "releases/unsigned/$bridge_name"
           (
             cd releases/unsigned
@@ -76,8 +87,8 @@ jobs:
       - name: Upload Linux bridge artifact
         uses: actions/upload-artifact@v4
         with:
-          name: PingIslandBridge-linux-${{ matrix.artifact_arch }}.zip
-          path: releases/unsigned/PingIslandBridge-linux-${{ matrix.artifact_arch }}.zip
+          name: PingIslandBridge-linux-musl-${{ matrix.artifact_arch }}.zip
+          path: releases/unsigned/PingIslandBridge-linux-musl-${{ matrix.artifact_arch }}.zip
           if-no-files-found: error
 
   release:
@@ -239,7 +250,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: releases/bridge
-          pattern: PingIslandBridge-linux-*.zip
+          pattern: PingIslandBridge-linux-musl-*.zip
           merge-multiple: true
 
       - name: Collect release metadata
@@ -253,7 +264,7 @@ jobs:
           zip_assets=(releases/signed/*.zip)
           notes_assets=(releases/signed/*.md)
           appcast_assets=(releases/signed/appcast/*.xml)
-          linux_bridge_assets=(releases/bridge/PingIslandBridge-linux-*.zip)
+          linux_bridge_assets=(releases/bridge/PingIslandBridge-linux-musl-*.zip)
 
           if [ "${#dmg_assets[@]}" -ne 1 ]; then
             echo "::error::Expected exactly one DMG asset in releases/signed, found ${#dmg_assets[@]}"
