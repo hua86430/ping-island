@@ -624,10 +624,27 @@ struct ChatView: View {
                 SessionQuestionForm(
                     intervention: intervention,
                     submitLabel: "提交所有回答",
+                    initialDraft: sessionMonitor.questionDraft(
+                        sessionId: sessionId,
+                        interventionId: intervention.id
+                    ),
                     onSubmit: { payload in
                         sessionMonitor.answerIntervention(sessionId: sessionId, answers: payload)
                     },
                     onInteractionStateChanged: { viewModel.setInlineTextInputActive($0) },
+                    onDraftChanged: { draft in
+                        sessionMonitor.updateQuestionDraft(
+                            sessionId: sessionId,
+                            interventionId: intervention.id,
+                            draft: draft
+                        )
+                    },
+                    onDraftCleared: {
+                        sessionMonitor.clearQuestionDraft(
+                            sessionId: sessionId,
+                            interventionId: intervention.id
+                        )
+                    },
                     secondaryActionTitle: secondaryActionTitle,
                     onSecondaryAction: onSecondaryAction
                 )

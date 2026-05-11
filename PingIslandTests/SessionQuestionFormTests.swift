@@ -205,6 +205,54 @@ final class SessionQuestionFormTests: XCTestCase {
         )
     }
 
+    func testQuestionDraftTreatsWhitespaceCustomAnswerAsEmpty() {
+        let draft = SessionQuestionFormDraft(
+            answers: [:],
+            otherAnswers: ["scope": "   \n"]
+        )
+
+        XCTAssertTrue(draft.isEmpty)
+    }
+
+    func testQuestionDraftCacheKeepsDraftUntilCleared() {
+        var cache = SessionQuestionDraftCache()
+        let draft = SessionQuestionFormDraft(
+            answers: ["scope": ["Use current choice"]],
+            otherAnswers: ["scope": "Keep my custom draft"]
+        )
+
+        cache.update(
+            sessionId: "session-a",
+            interventionId: "ask-1",
+            draft: draft
+        )
+
+        XCTAssertEqual(
+            cache.draft(sessionId: "session-a", interventionId: "ask-1"),
+            draft
+        )
+        XCTAssertNil(cache.draft(sessionId: "session-a", interventionId: "ask-2"))
+
+        cache.clear(sessionId: "session-a", interventionId: "ask-1")
+
+        XCTAssertNil(cache.draft(sessionId: "session-a", interventionId: "ask-1"))
+    }
+
+    func testQuestionDraftCacheDropsEmptyDraft() {
+        var cache = SessionQuestionDraftCache()
+
+        cache.update(
+            sessionId: "session-a",
+            interventionId: "ask-1",
+            draft: SessionQuestionFormDraft(
+                answers: [:],
+                otherAnswers: ["scope": ""]
+            )
+        )
+
+        XCTAssertNil(cache.draft(sessionId: "session-a", interventionId: "ask-1"))
+    }
+
     private func makeQuestion(
         id: String,
         allowsOther: Bool = false

@@ -577,11 +577,28 @@ private struct HoverQuestionInterventionCard: View {
                 SessionQuestionForm(
                     intervention: intervention,
                     submitLabel: "提交所有回答",
+                    initialDraft: sessionMonitor.questionDraft(
+                        sessionId: session.sessionId,
+                        interventionId: intervention.id
+                    ),
                     onSubmit: { payload in
                         sessionMonitor.answerIntervention(sessionId: session.sessionId, answers: payload)
                         onActionCompleted()
                     },
                     onInteractionStateChanged: onQuestionInteractionStateChanged,
+                    onDraftChanged: { draft in
+                        sessionMonitor.updateQuestionDraft(
+                            sessionId: session.sessionId,
+                            interventionId: intervention.id,
+                            draft: draft
+                        )
+                    },
+                    onDraftCleared: {
+                        sessionMonitor.clearQuestionDraft(
+                            sessionId: session.sessionId,
+                            interventionId: intervention.id
+                        )
+                    },
                     secondaryActionTitle: secondaryActionTitle,
                     onSecondaryAction: secondaryActionTitle == nil ? nil : {
                         Task {

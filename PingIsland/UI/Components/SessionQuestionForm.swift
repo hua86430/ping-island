@@ -5,6 +5,8 @@ struct SessionQuestionForm: View {
     let submitLabel: String?
     let onSubmit: ([String: [String]]) -> Void
     var onInteractionStateChanged: (Bool) -> Void = { _ in }
+    var onDraftChanged: (SessionQuestionFormDraft) -> Void = { _ in }
+    var onDraftCleared: () -> Void = {}
     var secondaryActionTitle: String? = nil
     var onSecondaryAction: (() -> Void)? = nil
     var isEditable: Bool = true
@@ -168,8 +170,11 @@ struct SessionQuestionForm: View {
         intervention: SessionIntervention,
         submitLabel: String? = nil,
         initialAnswers: [String: [String]] = [:],
+        initialDraft: SessionQuestionFormDraft? = nil,
         onSubmit: @escaping ([String: [String]]) -> Void,
         onInteractionStateChanged: @escaping (Bool) -> Void = { _ in },
+        onDraftChanged: @escaping (SessionQuestionFormDraft) -> Void = { _ in },
+        onDraftCleared: @escaping () -> Void = {},
         secondaryActionTitle: String? = nil,
         onSecondaryAction: (() -> Void)? = nil,
         isEditable: Bool = true
@@ -178,10 +183,13 @@ struct SessionQuestionForm: View {
         self.submitLabel = submitLabel
         self.onSubmit = onSubmit
         self.onInteractionStateChanged = onInteractionStateChanged
+        self.onDraftChanged = onDraftChanged
+        self.onDraftCleared = onDraftCleared
         self.secondaryActionTitle = secondaryActionTitle
         self.onSecondaryAction = onSecondaryAction
         self.isEditable = isEditable
-        _answers = State(initialValue: initialAnswers)
+        _answers = State(initialValue: isEditable ? (initialDraft?.answers ?? initialAnswers) : initialAnswers)
+        _otherAnswers = State(initialValue: isEditable ? (initialDraft?.otherAnswers ?? [:]) : [:])
     }
 
     var body: some View {
@@ -225,8 +233,14 @@ struct SessionQuestionForm: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .onAppear(perform: notifyInteractionState)
-        .onChange(of: answers) { _, _ in notifyInteractionState() }
-        .onChange(of: otherAnswers) { _, _ in notifyInteractionState() }
+        .onChange(of: answers) { _, _ in
+            notifyInteractionState()
+            persistDraft()
+        }
+        .onChange(of: otherAnswers) { _, _ in
+            notifyInteractionState()
+            persistDraft()
+        }
         .onChange(of: focusedQuestionID) { _, _ in notifyInteractionState() }
         .onDisappear {
             onInteractionStateChanged(false)
@@ -539,12 +553,26 @@ struct SessionQuestionForm: View {
 
     private func submitCurrentAnswers() {
         guard canSubmit && isEditable else { return }
+        onDraftCleared()
         onInteractionStateChanged(false)
         onSubmit(submissionPayload())
     }
 
     private func notifyInteractionState() {
         onInteractionStateChanged(protectsDraftInteraction && isEditable)
+    }
+
+    private func persistDraft() {
+        guard isEditable else { return }
+        let draft = SessionQuestionFormDraft(
+            answers: answers,
+            otherAnswers: otherAnswers
+        )
+        if draft.isEmpty {
+            onDraftCleared()
+        } else {
+            onDraftChanged(draft)
+        }
     }
 
     private func normalizedAnswers(from value: String) -> [String] {

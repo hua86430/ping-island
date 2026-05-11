@@ -190,11 +190,28 @@ struct CodexSessionView: View {
                 SessionQuestionForm(
                     intervention: intervention,
                     submitLabel: "Submit",
+                    initialDraft: sessionMonitor.questionDraft(
+                        sessionId: session.sessionId,
+                        interventionId: intervention.id
+                    ),
                     onSubmit: { payload in
                         sessionMonitor.answerIntervention(sessionId: session.sessionId, answers: payload)
                         viewModel.exitChat()
                     },
                     onInteractionStateChanged: { viewModel.setInlineTextInputActive($0) },
+                    onDraftChanged: { draft in
+                        sessionMonitor.updateQuestionDraft(
+                            sessionId: session.sessionId,
+                            interventionId: intervention.id,
+                            draft: draft
+                        )
+                    },
+                    onDraftCleared: {
+                        sessionMonitor.clearQuestionDraft(
+                            sessionId: session.sessionId,
+                            interventionId: intervention.id
+                        )
+                    },
                     secondaryActionTitle: secondaryActionTitle,
                     onSecondaryAction: {
                         if intervention.supportsInlineResponse && session.clientInfo.prefersAnsweredQuestionFollowupAction {

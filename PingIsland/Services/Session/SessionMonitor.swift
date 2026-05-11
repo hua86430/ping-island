@@ -27,6 +27,7 @@ class SessionMonitor: ObservableObject {
     private var hasStarted = false
     private var allSessions: [SessionState] = []
     private var usageRefreshTask: Task<Void, Never>?
+    private var questionDraftCache = SessionQuestionDraftCache()
 
     init(
         runtimeCoordinator: any RuntimeCoordinating = RuntimeCoordinator.shared,
@@ -78,6 +79,26 @@ class SessionMonitor: ObservableObject {
     }
 
     // MARK: - Monitoring Lifecycle
+
+    func questionDraft(sessionId: String, interventionId: String) -> SessionQuestionFormDraft? {
+        questionDraftCache.draft(sessionId: sessionId, interventionId: interventionId)
+    }
+
+    func updateQuestionDraft(
+        sessionId: String,
+        interventionId: String,
+        draft: SessionQuestionFormDraft
+    ) {
+        questionDraftCache.update(
+            sessionId: sessionId,
+            interventionId: interventionId,
+            draft: draft
+        )
+    }
+
+    func clearQuestionDraft(sessionId: String, interventionId: String) {
+        questionDraftCache.clear(sessionId: sessionId, interventionId: interventionId)
+    }
 
     func startMonitoring() {
         guard !hasStarted else { return }

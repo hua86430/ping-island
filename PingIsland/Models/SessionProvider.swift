@@ -866,6 +866,50 @@ struct SessionInterventionQuestion: Equatable, Identifiable, Sendable {
     }
 }
 
+struct SessionQuestionFormDraft: Equatable, Sendable {
+    let answers: [String: [String]]
+    let otherAnswers: [String: String]
+
+    nonisolated var isEmpty: Bool {
+        let hasSelectedAnswers = answers.values.contains { values in
+            values.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        }
+        let hasCustomAnswers = otherAnswers.values.contains { value in
+            !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return !hasSelectedAnswers && !hasCustomAnswers
+    }
+}
+
+struct SessionQuestionDraftCache: Equatable, Sendable {
+    private var drafts: [String: SessionQuestionFormDraft] = [:]
+
+    nonisolated func draft(sessionId: String, interventionId: String) -> SessionQuestionFormDraft? {
+        drafts[Self.key(sessionId: sessionId, interventionId: interventionId)]
+    }
+
+    mutating func update(
+        sessionId: String,
+        interventionId: String,
+        draft: SessionQuestionFormDraft
+    ) {
+        let key = Self.key(sessionId: sessionId, interventionId: interventionId)
+        if draft.isEmpty {
+            drafts[key] = nil
+        } else {
+            drafts[key] = draft
+        }
+    }
+
+    mutating func clear(sessionId: String, interventionId: String) {
+        drafts[Self.key(sessionId: sessionId, interventionId: interventionId)] = nil
+    }
+
+    private nonisolated static func key(sessionId: String, interventionId: String) -> String {
+        "\(sessionId)|\(interventionId)"
+    }
+}
+
 struct SessionIntervention: Equatable, Identifiable, Sendable {
     private nonisolated static let externalContinuationTimeout: TimeInterval = 5 * 60
     private nonisolated static let submittedAnswersMetadataKey = "submittedAnswersJSON"
