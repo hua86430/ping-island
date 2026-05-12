@@ -1224,6 +1224,13 @@ private struct SettingsPanelContentView: View {
                 } else {
                     SettingsLineDivider()
                     FloatingPetPlacementInfoCard()
+                    SettingsLineDivider()
+                    SettingsInfoLine(
+                        title: "宠物大小",
+                        subtitle: "自动模式会根据当前显示器分辨率调整；也可以固定为标准尺寸或始终放大。"
+                    ) {
+                        FloatingPetSizeModePicker(mode: $settings.floatingPetSizeMode)
+                    }
                 }
                 SettingsLineDivider()
 
@@ -4210,6 +4217,22 @@ private struct ClosedNotchTrailingContentPicker: View {
     }
 }
 
+private struct FloatingPetSizeModePicker: View {
+    @Binding var mode: FloatingPetSizeMode
+
+    var body: some View {
+        Picker("", selection: $mode) {
+            ForEach(FloatingPetSizeMode.allCases) { candidate in
+                Text(appLocalized: candidate.title).tag(candidate)
+            }
+        }
+        .labelsHidden()
+        .accessibilityLabel(Text(appLocalized: "宠物大小"))
+        .settingsMenuPicker(width: 132)
+        .help(AppLocalization.string(mode.subtitle))
+    }
+}
+
 struct IslandSurfaceModeSelector: View {
     @Binding var mode: IslandSurfaceMode
     var title: String? = "展示模式"
@@ -4266,7 +4289,8 @@ struct IslandSurfaceModeCard: View {
                         .overlay {
                             IslandSurfaceModePreviewScene(
                                 surfaceMode: mode,
-                                notchDisplayMode: settings.notchDisplayMode
+                                notchDisplayMode: settings.notchDisplayMode,
+                                floatingPetSizeMode: settings.floatingPetSizeMode
                             )
                             .padding(12)
                         }
@@ -4347,6 +4371,7 @@ struct IslandSurfaceModeCard: View {
 private struct IslandSurfaceModePreviewScene: View {
     let surfaceMode: IslandSurfaceMode
     let notchDisplayMode: NotchDisplayMode
+    let floatingPetSizeMode: FloatingPetSizeMode
     @ObservedObject private var settings = AppSettings.shared
 
     var body: some View {
@@ -4392,7 +4417,10 @@ private struct IslandSurfaceModePreviewScene: View {
     }
 
     private func floatingPreview(in size: CGSize) -> some View {
-        ZStack(alignment: .bottomTrailing) {
+        let mascotSize = 34 * previewScale
+        let numberSize = 12 * min(previewScale, 1.14)
+
+        return ZStack(alignment: .bottomTrailing) {
             VStack {
                 HStack {
                     Text(appLocalized: "右下角悬浮")
@@ -4419,17 +4447,28 @@ private struct IslandSurfaceModePreviewScene: View {
                     MascotView(
                         kind: settings.previewMascotKind,
                         status: .idle,
-                        size: 34
+                        size: mascotSize
                     )
 
                     Text("2")
-                        .font(.system(size: 12, weight: .bold, design: .rounded))
+                        .font(.system(size: numberSize, weight: .bold, design: .rounded))
                         .foregroundColor(Color(red: 1.0, green: 0.55, blue: 0.26))
                         .offset(y: -1)
                 }
             }
             .padding(.trailing, 16)
             .padding(.bottom, 12)
+        }
+    }
+
+    private var previewScale: CGFloat {
+        switch floatingPetSizeMode {
+        case .automatic:
+            return 1.08
+        case .standard:
+            return 1
+        case .large:
+            return 1.16
         }
     }
 }
