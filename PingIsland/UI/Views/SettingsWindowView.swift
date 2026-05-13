@@ -4395,6 +4395,7 @@ private struct IslandSurfaceModePreviewScene: View {
     let notchDisplayMode: NotchDisplayMode
     let floatingPetSizeMode: FloatingPetSizeMode
     @ObservedObject private var settings = AppSettings.shared
+    @State private var isHovered = false
 
     var body: some View {
         GeometryReader { proxy in
@@ -4409,6 +4410,10 @@ private struct IslandSurfaceModePreviewScene: View {
                     floatingPreview(in: proxy.size)
                 }
             }
+        }
+        .environment(\.mascotAnimationsEnabled, isHovered)
+        .onHover { hovering in
+            isHovered = hovering
         }
     }
 
