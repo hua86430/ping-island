@@ -539,6 +539,10 @@ class SessionMonitor: ObservableObject {
                     submittedAnswers: answers
                 )
             )
+            HookWalkthroughDemoRunner.shared.completeIfNeeded(
+                sessionId: sessionId,
+                intervention: intervention
+            )
         }
     }
 

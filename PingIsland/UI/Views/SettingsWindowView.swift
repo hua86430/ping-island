@@ -972,6 +972,15 @@ private struct SettingsPanelContentView: View {
                 scheduleCategoryRefresh(for: currentCategory, showLoading: false)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .settingsWindowCategorySelectionRequested)) { notification in
+            guard presentation == .window,
+                  let rawCategory = notification.userInfo?[SettingsWindowCategorySelectionRequest.categoryKey] as? String,
+                  let category = SettingsCategory(rawValue: rawCategory) else {
+                return
+            }
+
+            selectSidebarCategory(category)
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
             scheduleCategoryRefresh(for: currentCategory, showLoading: false)
         }
@@ -1652,6 +1661,25 @@ private struct SettingsPanelContentView: View {
         }
     }
 
+    private func replayFirstRunOnboardingDemo() {
+        SettingsWindowController.shared.dismiss()
+        AppSettings.notchDetachmentHintPending = false
+        AppSettings.floatingPetSettingsHintPending = false
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            PresentationModeWelcomeWindowController.shared.present { selectedMode in
+                AppSettings.surfaceMode = selectedMode
+                AppSettings.presentationModeOnboardingPending = false
+                AppSettings.notchDetachmentHintPending = false
+                AppSettings.floatingPetSettingsHintPending = false
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                    HookWalkthroughDemoRunner.shared.start()
+                }
+            }
+        }
+    }
+
     private var shortcutsContent: some View {
         VStack(alignment: .leading, spacing: 18) {
             SettingsSectionCard(title: "全局快捷键") {
@@ -1818,6 +1846,31 @@ private struct SettingsPanelContentView: View {
                     subtitle: "开启后 Ping Island 不再代答 Claude / Codex 等的工具审批和 AskUserQuestion，所有提问保留在终端中处理；状态指示仍会显示。",
                     isOn: $settings.routePromptsToTerminal
                 )
+                SettingsLineDivider()
+
+                SettingsActionLine(
+                    title: "重新体验首次引导",
+                    subtitle: "手动打开形态选择引导；选择刘海屏或独立悬浮宠物后，会继续进入 Hooks 演示。"
+                ) {
+                    replayFirstRunOnboardingDemo()
+                } accessory: {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(SettingsCategory.integration.tint.opacity(0.95))
+                }
+                SettingsLineDivider()
+
+                SettingsActionLine(
+                    title: "体验 Hooks 演示",
+                    subtitle: "启动一轮可交互案例：干净桌面背景、审批提交、处理完成、完成提醒。顶部 Island 与独立悬浮宠物都支持。"
+                ) {
+                    SettingsWindowController.shared.dismiss()
+                    HookWalkthroughDemoRunner.shared.start()
+                } accessory: {
+                    Image(systemName: "play.circle.fill")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundColor(TerminalColors.blue.opacity(0.95))
+                }
             }
 
 #if !APP_STORE
