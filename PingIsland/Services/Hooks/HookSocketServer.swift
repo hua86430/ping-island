@@ -582,7 +582,7 @@ private extension BridgeEnvelope {
             sessionId: sessionId,
             cwd: resolvedCWD,
             event: eventType,
-            status: Self.mapStatus(eventType: eventType, status: status?.kind, notificationType: metadata["notification_type"]),
+            status: Self.mapStatus(eventType: eventType, status: status?.kind, notificationType: metadata["notification_type"], provider: provider),
             provider: provider.sessionProvider,
             clientInfo: Self.makeClientInfo(
                 provider: provider,
@@ -613,7 +613,8 @@ private extension BridgeEnvelope {
     private static func mapStatus(
         eventType: String,
         status: BridgeStatusKind?,
-        notificationType: String?
+        notificationType: String?,
+        provider: BridgeProvider = .claude
     ) -> String {
         if eventType == "Notification", notificationType == "idle_prompt" {
             return "waiting_for_input"
@@ -646,7 +647,7 @@ private extension BridgeEnvelope {
         case "SessionStart", "SubagentStop":
             return "waiting_for_input"
         case "Stop":
-            return "idle"
+            return provider == .codex ? "waiting_for_input" : "idle"
         case "UserPromptSubmit", "PostToolUse":
             return "processing"
         case "PreToolUse":
