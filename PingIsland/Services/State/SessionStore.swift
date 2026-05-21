@@ -1881,6 +1881,10 @@ actor SessionStore {
     ) -> Bool {
         guard session.phase.isActive else { return false }
         guard incomingPhase == .idle else { return false }
+        if session.provider == .codex {
+            // Codex rollout/app-server idle describes a quiet turn, not a finished client session.
+            return true
+        }
         return sessionHasLiveExecutionEvidence(session)
     }
 
@@ -3227,7 +3231,7 @@ actor SessionStore {
         session.codexSubagentDepth = snapshot.subagentDepth
         session.codexSubagentNickname = snapshot.subagentNickname
         session.codexSubagentRole = snapshot.subagentRole
-        let shouldPreserveExternalIntervention = shouldPreserveExternalCodexIntervention(
+        let shouldPreserveExternalIntervention = !snapshot.isTurnInterrupted && shouldPreserveExternalCodexIntervention(
             current: session.intervention,
             incoming: snapshot.intervention,
             nextPhase: snapshot.phase,
@@ -3242,6 +3246,8 @@ actor SessionStore {
             } else if !session.phase.needsAttention {
                 session.phase = snapshot.phase
             }
+        } else if snapshot.isTurnInterrupted, snapshot.phase == .idle {
+            session.phase = .idle
         } else if shouldPreserveActivePhaseDuringApparentIdle(
             session: session,
             incomingPhase: snapshot.phase,

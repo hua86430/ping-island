@@ -180,6 +180,42 @@ final class CodexRolloutParserTests: XCTestCase {
         XCTAssertEqual(snapshot?.latestResponseText, "我会用内存状态实现这个示例。")
     }
 
+    func testRolloutParserMarksRunningToolInterruptedAfterTurnAbort() async throws {
+        let tempDirectory = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tempDirectory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDirectory) }
+
+        let threadId = "019dc0b1-1b2c-73d8-9d3d-9833ecfc7fb2"
+        let rolloutURL = tempDirectory.appendingPathComponent("rollout-\(threadId).jsonl")
+        let rollout = """
+        {"timestamp":"2026-04-24T17:59:20Z","type":"session_meta","payload":{"id":"\(threadId)","cwd":"/Users/ping-island/Island","originator":"Codex Desktop","source":"desktop"}}
+        {"timestamp":"2026-04-24T17:59:21Z","type":"event_msg","payload":{"type":"user_message","message":"run tests"}}
+        {"timestamp":"2026-04-24T17:59:27Z","type":"response_item","payload":{"type":"function_call","name":"exec_command","call_id":"call_tests","arguments":"{\\"command\\":\\"xcodebuild test\\"}"}}
+        {"timestamp":"2026-04-24T17:59:40Z","type":"event_msg","payload":{"type":"turn_aborted","turn_id":"turn-1","reason":"interrupted"}}
+        """
+        try rollout.write(to: rolloutURL, atomically: true, encoding: .utf8)
+
+        let snapshot = await CodexRolloutParser.shared.parseThread(
+            threadId: threadId,
+            fallbackCwd: "/Users/ping-island/Island",
+            clientInfo: SessionClientInfo(
+                kind: .codexApp,
+                profileID: "codex-app",
+                name: "Codex App",
+                bundleIdentifier: "com.openai.codex",
+                sessionFilePath: rolloutURL.path
+            )
+        )
+
+        XCTAssertEqual(snapshot?.phase, .idle)
+        XCTAssertEqual(snapshot?.isTurnInterrupted, true)
+        guard case .toolCall(let tool) = snapshot?.historyItems.last?.type else {
+            return XCTFail("Expected interrupted tool call")
+        }
+        XCTAssertEqual(tool.status, .interrupted)
+    }
+
     func testRolloutParserExtractsCodexSubagentMetadataFromSessionMeta() async throws {
         let tempDirectory = FileManager.default.temporaryDirectory
             .appendingPathComponent(UUID().uuidString, isDirectory: true)

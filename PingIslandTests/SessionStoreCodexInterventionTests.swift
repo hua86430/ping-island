@@ -114,6 +114,38 @@ final class SessionStoreCodexInterventionTests: XCTestCase {
         await store.process(.sessionArchived(sessionId: sessionId))
     }
 
+    func testCodexAppServerIdleRefreshDoesNotDowngradeActiveSession() async {
+        let sessionId = "codex-active-refresh-\(UUID().uuidString)"
+        let store = SessionStore.shared
+
+        await store.upsertCodexSession(
+            sessionId: sessionId,
+            name: "Implement feature",
+            preview: "Working",
+            cwd: "/tmp/project",
+            phase: .processing,
+            intervention: nil,
+            clientInfo: SessionClientInfo(kind: .codexCLI, profileID: "codex-cli", name: "Codex")
+        )
+
+        await store.upsertCodexSession(
+            sessionId: sessionId,
+            name: "Implement feature",
+            preview: "Done with current step",
+            cwd: "/tmp/project",
+            phase: .idle,
+            intervention: nil,
+            clientInfo: SessionClientInfo(kind: .codexCLI, profileID: "codex-cli", name: "Codex"),
+            activityAt: Date().addingTimeInterval(10)
+        )
+
+        let session = await store.session(for: sessionId)
+        XCTAssertEqual(session?.phase, .processing)
+        XCTAssertEqual(session?.previewText, "Done with current step")
+
+        await store.process(.sessionArchived(sessionId: sessionId))
+    }
+
     func testCodexRequestUserInputResponsePayloadMatchesAppServerShape() throws {
         let payload = CodexAppServerMonitor.requestUserInputResponsePayload(answers: [
             "focus": ["Planning"],
@@ -330,6 +362,94 @@ final class SessionStoreCodexInterventionTests: XCTestCase {
         let session = await store.session(for: sessionId)
         XCTAssertEqual(session?.phase, .processing)
         XCTAssertEqual(session?.lastActivity, startedAt)
+
+        await store.process(.sessionArchived(sessionId: sessionId))
+    }
+
+    func testCodexTurnAbortAllowsRunningThreadToReturnIdle() async {
+        let sessionId = "codex-aborted-tool-\(UUID().uuidString)"
+        let store = SessionStore.shared
+        let startedAt = Date()
+        let runningTool = ChatHistoryItem(
+            id: "tool-1",
+            type: .toolCall(ToolCallItem(
+                name: "shell",
+                input: ["command": "xcodebuild test"],
+                status: .running,
+                result: nil,
+                structuredResult: nil,
+                subagentTools: []
+            )),
+            timestamp: startedAt
+        )
+
+        await store.syncCodexThreadSnapshot(
+            CodexThreadSnapshot(
+                threadId: sessionId,
+                name: "Codex",
+                preview: "Running tests",
+                cwd: "/tmp/project",
+                clientInfo: SessionClientInfo(kind: .codexCLI, profileID: "codex-cli", name: "Codex"),
+                intervention: nil,
+                createdAt: startedAt,
+                updatedAt: startedAt,
+                phase: .processing,
+                historyItems: [runningTool],
+                conversationInfo: ConversationInfo(
+                    summary: "Codex",
+                    lastMessage: nil,
+                    lastMessageRole: nil,
+                    lastToolName: nil,
+                    firstUserMessage: "run tests",
+                    lastUserMessageDate: startedAt
+                ),
+                latestTurnId: "turn-1",
+                latestResponseText: nil,
+                latestResponsePhase: nil,
+                latestUserText: "run tests"
+            )
+        )
+
+        var interruptedTool = runningTool
+        if case .toolCall(var tool) = runningTool.type {
+            tool.status = .interrupted
+            interruptedTool = ChatHistoryItem(id: runningTool.id, type: .toolCall(tool), timestamp: runningTool.timestamp)
+        }
+
+        await store.syncCodexThreadSnapshot(
+            CodexThreadSnapshot(
+                threadId: sessionId,
+                name: "Codex",
+                preview: "Interrupted",
+                cwd: "/tmp/project",
+                clientInfo: SessionClientInfo(kind: .codexCLI, profileID: "codex-cli", name: "Codex"),
+                intervention: nil,
+                createdAt: startedAt,
+                updatedAt: startedAt.addingTimeInterval(30),
+                phase: .idle,
+                historyItems: [interruptedTool],
+                conversationInfo: ConversationInfo(
+                    summary: "Codex",
+                    lastMessage: nil,
+                    lastMessageRole: nil,
+                    lastToolName: nil,
+                    firstUserMessage: "run tests",
+                    lastUserMessageDate: startedAt
+                ),
+                latestTurnId: "turn-1",
+                latestResponseText: nil,
+                latestResponsePhase: nil,
+                latestUserText: "run tests",
+                isTurnInterrupted: true
+            )
+        )
+
+        let session = await store.session(for: sessionId)
+        XCTAssertEqual(session?.phase, .idle)
+        guard case .toolCall(let tool) = session?.chatItems.last?.type else {
+            return XCTFail("Expected interrupted tool call")
+        }
+        XCTAssertEqual(tool.status, .interrupted)
 
         await store.process(.sessionArchived(sessionId: sessionId))
     }

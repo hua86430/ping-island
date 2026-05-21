@@ -18,6 +18,35 @@ final class CodexHookSessionTests: XCTestCase {
         await store.process(.sessionArchived(sessionId: sessionId))
     }
 
+    func testCodexIdlePromptDoesNotDowngradeActiveSession() async {
+        let sessionId = "codex-idle-prompt-\(UUID().uuidString)"
+        let store = SessionStore.shared
+
+        await store.process(.hookReceived(makeCodexSessionStartEvent(sessionId: sessionId)))
+        await store.process(.hookReceived(
+            HookEvent(
+                sessionId: sessionId,
+                cwd: "/tmp/project",
+                event: "Notification",
+                status: "waiting_for_input",
+                provider: .codex,
+                clientInfo: SessionClientInfo.codexApp(threadId: sessionId),
+                pid: nil,
+                tty: nil,
+                tool: nil,
+                toolInput: nil,
+                toolUseId: nil,
+                notificationType: "idle_prompt",
+                message: "Idle heartbeat"
+            )
+        ))
+
+        let session = await store.session(for: sessionId)
+        XCTAssertEqual(session?.phase, .processing)
+
+        await store.process(.sessionArchived(sessionId: sessionId))
+    }
+
     func testCodexTitleGenerationPromptStillGetsIgnored() async {
         let sessionId = "codex-title-generation-\(UUID().uuidString)"
         let store = SessionStore.shared

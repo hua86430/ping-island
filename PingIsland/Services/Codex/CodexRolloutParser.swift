@@ -82,6 +82,7 @@ actor CodexRolloutParser {
         var latestFinalText: String?
         var latestFinalPhase: String?
         var phase: SessionPhase = .idle
+        var isTurnInterrupted = false
         var intervention: SessionIntervention?
         var sessionName: String?
         var origin: String?
@@ -133,6 +134,7 @@ actor CodexRolloutParser {
                 switch payload["type"] as? String {
                 case "user_message":
                     guard let text = normalizedText(payload["message"]) else { continue }
+                    isTurnInterrupted = false
                     if firstUserMessage == nil {
                         firstUserMessage = text
                     }
@@ -171,6 +173,7 @@ actor CodexRolloutParser {
                     ))
 
                 case "task_started":
+                    isTurnInterrupted = false
                     phase = .processing
 
                 case "task_complete":
@@ -180,6 +183,12 @@ actor CodexRolloutParser {
 
                 case "context_compacted":
                     phase = .compacting
+
+                case "turn_aborted":
+                    isTurnInterrupted = true
+                    intervention = nil
+                    markRunningToolsInterrupted(in: &historyItems)
+                    phase = .idle
 
                 default:
                     continue
@@ -193,6 +202,7 @@ actor CodexRolloutParser {
                 case "function_call":
                     guard let callId = stringValue(payload["call_id"]),
                           let name = stringValue(payload["name"]) else { continue }
+                    isTurnInterrupted = false
                     let inputObject = parseJSONStringObject(payload["arguments"])
                     let input = parseJSONStringDictionary(inputObject ?? payload["arguments"])
                     let item = ChatHistoryItem(
@@ -223,6 +233,7 @@ actor CodexRolloutParser {
                 case "custom_tool_call":
                     guard let callId = stringValue(payload["call_id"]),
                           let name = stringValue(payload["name"]) else { continue }
+                    isTurnInterrupted = false
                     let input = customToolInput(from: payload["input"])
                     let status = stringValue(payload["status"]) == "completed" ? ToolStatus.success : .running
                     let item = ChatHistoryItem(
@@ -245,6 +256,7 @@ actor CodexRolloutParser {
 
                 case "web_search_call":
                     guard let callId = stringValue(payload["call_id"]) else { continue }
+                    isTurnInterrupted = false
                     let query = stringValue(payload["query"]) ?? stringValue(payload["input"]) ?? ""
                     let item = ChatHistoryItem(
                         id: callId,
@@ -308,6 +320,9 @@ actor CodexRolloutParser {
 
         if intervention?.kind == .question {
             phase = .waitingForInput
+        } else if isTurnInterrupted {
+            markRunningToolsInterrupted(in: &historyItems)
+            phase = .idle
         } else if historyItems.contains(where: Self.isRunningToolItem(_:)) {
             phase = .processing
         } else if phase == .processing, latestFinalText != nil {
@@ -387,7 +402,8 @@ actor CodexRolloutParser {
             latestTurnId: latestTurnId,
             latestResponseText: latestFinalText ?? latestAgentText,
             latestResponsePhase: latestFinalPhase ?? latestAgentPhase,
-            latestUserText: latestUserText
+            latestUserText: latestUserText,
+            isTurnInterrupted: isTurnInterrupted
         )
     }
 
@@ -466,6 +482,22 @@ actor CodexRolloutParser {
             return false
         }
         return tool.status == .running || tool.status == .waitingForApproval
+    }
+
+    private func markRunningToolsInterrupted(in historyItems: inout [ChatHistoryItem]) {
+        for index in historyItems.indices {
+            guard case .toolCall(var tool) = historyItems[index].type,
+                  tool.status == .running || tool.status == .waitingForApproval else {
+                continue
+            }
+
+            tool.status = .interrupted
+            historyItems[index] = ChatHistoryItem(
+                id: historyItems[index].id,
+                type: .toolCall(tool),
+                timestamp: historyItems[index].timestamp
+            )
+        }
     }
 
     private static func pendingMCPApprovalIntervention(from historyItems: [ChatHistoryItem]) -> SessionIntervention? {
