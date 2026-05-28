@@ -70,7 +70,20 @@ struct AgentUsageHeatmapDay: Equatable, Identifiable, Sendable {
     nonisolated var id: Date { date }
 }
 
+struct AgentUsageTrendPoint: Equatable, Identifiable, Sendable {
+    let date: Date
+    let tokenTotal: Int
+    let agentCount: Int
+    let toolUseCount: Int
+    let sessionCount: Int
+
+    nonisolated var id: Date { date }
+}
+
 struct AgentUsageDashboardSnapshot: Equatable, Sendable {
+    private nonisolated static let annualHeatmapDayCount = 365
+    private nonisolated static let trendDayCount = 7
+
     let range: AgentUsageRange
     let sessionCount: Int
     let toolUseCount: Int
@@ -78,6 +91,7 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
     let topAgents: [AgentUsageRankItem]
     let topTools: [AgentUsageRankItem]
     let heatmapDays: [AgentUsageHeatmapDay]
+    let trendPoints: [AgentUsageTrendPoint]
 
     nonisolated static func empty(range: AgentUsageRange, now: Date = Date(), calendar: Calendar = .current) -> AgentUsageDashboardSnapshot {
         AgentUsageDashboardSnapshot(
@@ -87,7 +101,8 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
             tokenTotals: AgentUsageTokenTotals(),
             topAgents: [],
             topTools: [],
-            heatmapDays: heatmapDays(range: range, now: now, buckets: [:], calendar: calendar)
+            heatmapDays: annualHeatmapDays(now: now, buckets: [:], calendar: calendar),
+            trendPoints: trendPoints(now: now, buckets: [:], calendar: calendar)
         )
     }
 
@@ -95,20 +110,43 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
         sessionCount > 0 || toolUseCount > 0 || tokenTotals.resolvedTotal > 0
     }
 
-    fileprivate nonisolated static func heatmapDays(
-        range: AgentUsageRange,
+    fileprivate nonisolated static func annualHeatmapDays(
         now: Date,
         buckets: [String: AgentUsageDailyBucket],
         calendar: Calendar
     ) -> [AgentUsageHeatmapDay] {
         let today = calendar.startOfDay(for: now)
 
-        return (0..<range.dayCount).reversed().compactMap { offset in
+        return (0..<annualHeatmapDayCount).reversed().compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
                 return nil
             }
             let key = AgentUsageStore.dayKey(for: date, calendar: calendar)
             return AgentUsageHeatmapDay(date: date, activityCount: buckets[key]?.activityCount ?? 0)
+        }
+    }
+
+    fileprivate nonisolated static func trendPoints(
+        now: Date,
+        buckets: [String: AgentUsageDailyBucket],
+        calendar: Calendar
+    ) -> [AgentUsageTrendPoint] {
+        let today = calendar.startOfDay(for: now)
+
+        return (0..<trendDayCount).reversed().compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
+                return nil
+            }
+            let key = AgentUsageStore.dayKey(for: date, calendar: calendar)
+            let bucket = buckets[key]
+            let sessionCount = bucket?.sessionIDsByAgent.values.reduce(0) { $0 + $1.count } ?? 0
+            return AgentUsageTrendPoint(
+                date: date,
+                tokenTotal: bucket?.tokenTotals.resolvedTotal ?? 0,
+                agentCount: bucket?.sessionIDsByAgent.count ?? 0,
+                toolUseCount: bucket?.toolCounts.values.reduce(0, +) ?? 0,
+                sessionCount: sessionCount
+            )
         }
     }
 }
@@ -395,8 +433,12 @@ actor AgentUsageStore {
                 total: max(1, sessionCount)
             ),
             topTools: rankItems(counts: toolCounts, total: max(1, toolUseCount)),
-            heatmapDays: AgentUsageDashboardSnapshot.heatmapDays(
-                range: range,
+            heatmapDays: AgentUsageDashboardSnapshot.annualHeatmapDays(
+                now: now,
+                buckets: document.buckets,
+                calendar: calendar
+            ),
+            trendPoints: AgentUsageDashboardSnapshot.trendPoints(
                 now: now,
                 buckets: document.buckets,
                 calendar: calendar

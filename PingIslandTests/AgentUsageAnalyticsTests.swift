@@ -70,8 +70,17 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(snapshot.topAgents.map(\.count), [2, 1])
         XCTAssertEqual(snapshot.topTools.map(\.name), ["Read", "Bash"])
         XCTAssertEqual(snapshot.topTools.map(\.count), [4, 2])
-        XCTAssertEqual(snapshot.heatmapDays.count, 7)
+        XCTAssertEqual(snapshot.heatmapDays.count, 365)
         XCTAssertEqual(snapshot.heatmapDays.last?.activityCount, 8)
+        XCTAssertEqual(
+            snapshot.heatmapDays.first { AgentUsageStore.dayKey(for: $0.date, calendar: calendar) == older }?.activityCount,
+            12
+        )
+        XCTAssertEqual(snapshot.trendPoints.count, 7)
+        XCTAssertEqual(snapshot.trendPoints.last?.tokenTotal, 150)
+        XCTAssertEqual(snapshot.trendPoints.last?.agentCount, 2)
+        XCTAssertEqual(snapshot.trendPoints.last?.toolUseCount, 5)
+        XCTAssertEqual(snapshot.trendPoints.last?.sessionCount, 3)
     }
 
     func testRecordCodexUsageSnapshotStoresOnlyPositiveDeltas() async throws {

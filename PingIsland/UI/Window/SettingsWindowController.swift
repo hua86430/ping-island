@@ -8,6 +8,26 @@ extension Notification.Name {
     static let settingsWindowCategorySelectionRequested = Notification.Name("settingsWindowCategorySelectionRequested")
 }
 
+enum SettingsWindowLayout {
+    @MainActor
+    static func resetContentSize(of window: NSWindow?) {
+        guard let window else { return }
+
+        window.minSize = NSSize(
+            width: AppSettings.minimumSettingsWindowSize.width,
+            height: AppSettings.minimumSettingsWindowSize.height
+        )
+        window.maxSize = NSSize(
+            width: AppSettings.maximumSettingsWindowSize.width,
+            height: AppSettings.maximumSettingsWindowSize.height
+        )
+        window.setContentSize(NSSize(
+            width: SettingsWindowDefaults.defaultContentSize.width,
+            height: SettingsWindowDefaults.defaultContentSize.height
+        ))
+    }
+}
+
 enum SettingsWindowVisibilityNotification {
     static let isVisibleKey = "isVisible"
 }
@@ -136,6 +156,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
             object: self,
             userInfo: [SettingsWindowCategorySelectionRequest.categoryKey: category.rawValue]
         )
+    }
+
+    func resetToDefaultContentSize() {
+        SettingsWindowLayout.resetContentSize(of: window)
     }
 
     func dismiss() {

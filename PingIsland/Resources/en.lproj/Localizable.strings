@@ -60,6 +60,9 @@
 "调整会话列表、hover 预览和结果视图的文字大小" = "Adjust text size in session lists, hover previews, and result views";
 "最大面板高度" = "Maximum panel height";
 "控制聊天面板和 hover 预览的最大展开高度" = "Control the maximum expanded height of chat panels and hover previews";
+"设置面板大小" = "Settings panel size";
+"将设置面板恢复到默认宽高，适合窗口被拉大或缩小时快速回到推荐布局。" = "Restore the Settings panel to its default width and height when the window has been resized.";
+"重置" = "Reset";
 "展示模式" = "Presentation mode";
 "选择 Ping Island 的主显示方式。你随时可以在设置里切换，并立即看到新的渲染效果。" = "Choose how Ping Island renders by default. You can switch it any time in Settings and see the new presentation immediately.";
 "刘海屏方式" = "Top Island";

@@ -890,100 +890,470 @@ private struct AgentUsageAnalyticsContent: View {
     @StateObject private var viewModel = AgentUsageAnalyticsViewModel()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            SettingsSectionCard(title: "本地统计") {
-                VStack(alignment: .leading, spacing: 14) {
-                    HStack(alignment: .center, spacing: 12) {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(appLocalized: "Agent 使用趋势")
-                                .font(.system(size: 14, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.90))
-                            Text(appLocalized: "统计仅保存在本机，来自 Hook、转录文件和 Codex token_count 快照。")
-                                .font(.system(size: 12, weight: .medium))
-                                .foregroundColor(.white.opacity(0.52))
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(appLocalized: "统计")
+                    .font(.system(size: 18, weight: .bold))
+                    .foregroundColor(.white.opacity(0.94))
 
-                        Spacer(minLength: 12)
+                Text(appLocalized: "查看 Agent、Token、工具调用与活跃概览")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(.white.opacity(0.48))
+            }
 
-                        Button(action: viewModel.refresh) {
-                            Image(systemName: viewModel.isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white.opacity(0.72))
-                                .frame(width: 28, height: 28)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .help("刷新本地统计")
-                    }
+            AgentUsageSummaryCards(snapshot: viewModel.snapshot)
 
-                    Picker("统计范围", selection: Binding(
-                        get: { viewModel.selectedRange },
-                        set: { viewModel.selectRange($0) }
-                    )) {
-                        ForEach(AgentUsageRange.allCases) { range in
-                            Text(appLocalized: range.title).tag(range)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                    .frame(width: 256)
+            overviewCard
+
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 18) {
+                    rankingCard(
+                        title: "Agent 类型排行",
+                        items: viewModel.snapshot.topAgents,
+                        emptyTitle: "还没有可展示的 Agent 数据",
+                        tint: SettingsCategory.analytics.tint
+                    )
+                    .frame(maxWidth: .infinity)
+
+                    rankingCard(
+                        title: "工具调用 Top 5",
+                        items: viewModel.snapshot.topTools,
+                        emptyTitle: "还没有可展示的工具调用",
+                        tint: TerminalColors.blue
+                    )
+                    .frame(maxWidth: .infinity)
                 }
-            }
 
-            SettingsSectionCard(title: "概览") {
-                VStack(spacing: 0) {
-                    AgentUsageMetricLine(
-                        title: "Agent 类型",
-                        value: "\(viewModel.snapshot.topAgents.count)",
-                        subtitle: "本周期出现的客户端类型"
+                VStack(alignment: .leading, spacing: 18) {
+                    rankingCard(
+                        title: "Agent 类型排行",
+                        items: viewModel.snapshot.topAgents,
+                        emptyTitle: "还没有可展示的 Agent 数据",
+                        tint: SettingsCategory.analytics.tint
                     )
-                    SettingsLineDivider()
-                    AgentUsageMetricLine(
-                        title: "会话数",
-                        value: AgentUsageFormat.integer(viewModel.snapshot.sessionCount),
-                        subtitle: "按 agent 类型去重后的会话"
+                    rankingCard(
+                        title: "工具调用 Top 5",
+                        items: viewModel.snapshot.topTools,
+                        emptyTitle: "还没有可展示的工具调用",
+                        tint: TerminalColors.blue
                     )
-                    SettingsLineDivider()
-                    AgentUsageMetricLine(
-                        title: "工具使用",
-                        value: AgentUsageFormat.integer(viewModel.snapshot.toolUseCount),
-                        subtitle: "去重后的工具调用次数"
-                    )
-                    SettingsLineDivider()
-                    AgentUsageMetricLine(
-                        title: "Token 消耗",
-                        value: AgentUsageFormat.compactTokenCount(viewModel.snapshot.tokenTotals.resolvedTotal),
-                        subtitle: "Codex 累计快照的本地增量"
-                    )
-                    SettingsLineDivider()
-                    AgentUsageTokenSplitLine(totals: viewModel.snapshot.tokenTotals)
                 }
-            }
-
-            SettingsSectionCard(title: "Agent 类型排行") {
-                AgentUsageRankingList(
-                    items: viewModel.snapshot.topAgents,
-                    emptyTitle: "还没有可展示的 Agent 数据",
-                    tint: SettingsCategory.analytics.tint
-                )
-            }
-
-            SettingsSectionCard(title: "高频工具") {
-                AgentUsageRankingList(
-                    items: viewModel.snapshot.topTools,
-                    emptyTitle: "还没有可展示的工具调用",
-                    tint: TerminalColors.green
-                )
-            }
-
-            SettingsSectionCard(title: "活跃热力图") {
-                AgentUsageHeatmapView(days: viewModel.snapshot.heatmapDays)
             }
         }
         .onAppear {
             viewModel.refresh()
         }
+    }
+
+    private var overviewCard: some View {
+        SettingsSectionCard(title: "概览") {
+            AgentUsageRangeControl(
+                selectedRange: viewModel.selectedRange,
+                isRefreshing: viewModel.isRefreshing,
+                selectRange: viewModel.selectRange,
+                refresh: viewModel.refresh
+            )
+        } content: {
+            VStack(spacing: 0) {
+                AgentUsageOverviewLine(
+                    icon: "person.crop.circle",
+                    title: "Agent 类型",
+                    value: "\(viewModel.snapshot.topAgents.count)",
+                    subtitle: "本周期出现的客户端类型"
+                )
+                AgentUsageInsetDivider()
+                AgentUsageOverviewLine(
+                    icon: "bubble.left.and.bubble.right",
+                    title: "会话数",
+                    value: AgentUsageFormat.integer(viewModel.snapshot.sessionCount),
+                    subtitle: "按 agent 类型去重后的会话"
+                )
+                AgentUsageInsetDivider()
+                AgentUsageOverviewLine(
+                    icon: "wrench.and.screwdriver",
+                    title: "工具使用",
+                    value: AgentUsageFormat.integer(viewModel.snapshot.toolUseCount),
+                    subtitle: "去重后的工具调用次数"
+                )
+                AgentUsageInsetDivider()
+                AgentUsageOverviewLine(
+                    icon: "cube.transparent",
+                    title: "Token 消耗",
+                    value: AgentUsageFormat.compactTokenCount(viewModel.snapshot.tokenTotals.resolvedTotal),
+                    subtitle: "Codex 累计快照的本地增量"
+                )
+                AgentUsageInsetDivider()
+                AgentUsageTokenSplitLine(totals: viewModel.snapshot.tokenTotals)
+            }
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private func rankingCard(
+        title: String,
+        items: [AgentUsageRankItem],
+        emptyTitle: String,
+        tint: Color
+    ) -> some View {
+        SettingsSectionCard(title: title) {
+            AgentUsageRankingList(
+                items: items,
+                emptyTitle: emptyTitle,
+                tint: tint
+            )
+            .padding(.horizontal, 18)
+            .padding(.vertical, 8)
+        }
+    }
+}
+
+private struct AgentUsageRangeControl: View {
+    let selectedRange: AgentUsageRange
+    let isRefreshing: Bool
+    let selectRange: (AgentUsageRange) -> Void
+    let refresh: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Picker("统计范围", selection: Binding(
+                get: { selectedRange },
+                set: { selectRange($0) }
+            )) {
+                ForEach(AgentUsageRange.allCases) { range in
+                    Text(appLocalized: range.title).tag(range)
+                }
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+            .frame(width: 186)
+
+            Button(action: refresh) {
+                Image(systemName: isRefreshing ? "arrow.triangle.2.circlepath" : "arrow.clockwise")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.72))
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("刷新本地统计")
+        }
+    }
+}
+
+private struct AgentUsageSummaryCards: View {
+    let snapshot: AgentUsageDashboardSnapshot
+
+    private let spacing: CGFloat = 16
+    private let wideCardWidth: CGFloat = 220
+    private let twoColumnMinWidth: CGFloat = 176
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: spacing) {
+                tokenCard
+                    .frame(width: wideCardWidth)
+                agentCard
+                    .frame(width: wideCardWidth)
+                toolCard
+                    .frame(width: wideCardWidth)
+                sessionCard
+                    .frame(width: wideCardWidth)
+            }
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(minimum: twoColumnMinWidth), spacing: spacing),
+                    GridItem(.flexible(minimum: twoColumnMinWidth), spacing: spacing),
+                ],
+                alignment: .leading,
+                spacing: spacing
+            ) {
+                tokenCard
+                agentCard
+                toolCard
+                sessionCard
+            }
+
+            VStack(spacing: spacing) {
+                tokenCard
+                agentCard
+                toolCard
+                sessionCard
+            }
+        }
+    }
+
+    private var tokenCard: some View {
+        AgentUsageSummaryCard(
+            icon: "cube.transparent",
+            title: "Token 消耗",
+            value: AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.resolvedTotal),
+            subtitle: "输入 \(AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.input)) / 输出 \(AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.output))",
+            trendValues: snapshot.trendPoints.map(\.tokenTotal),
+            tint: SettingsCategory.analytics.tint
+        )
+    }
+
+    private var agentCard: some View {
+        AgentUsageSummaryCard(
+            icon: "person.crop.circle",
+            title: "活跃 Agent",
+            value: "\(snapshot.topAgents.count)",
+            subtitle: "本周期出现的客户端类型",
+            trendValues: snapshot.trendPoints.map(\.agentCount),
+            tint: TerminalColors.blue
+        )
+    }
+
+    private var toolCard: some View {
+        AgentUsageSummaryCard(
+            icon: "wrench.and.screwdriver",
+            title: "工具调用",
+            value: AgentUsageFormat.integer(snapshot.toolUseCount),
+            subtitle: "去重后的工具调用次数",
+            trendValues: snapshot.trendPoints.map(\.toolUseCount),
+            tint: TerminalColors.amber
+        )
+    }
+
+    private var sessionCard: some View {
+        AgentUsageSummaryCard(
+            icon: "bubble.left.and.bubble.right",
+            title: "会话数",
+            value: AgentUsageFormat.integer(snapshot.sessionCount),
+            subtitle: "按 agent 类型去重后的会话",
+            trendValues: snapshot.trendPoints.map(\.sessionCount),
+            tint: TerminalColors.green
+        )
+    }
+}
+
+private struct AgentUsageSummaryCard: View {
+    let icon: String
+    let title: String
+    let value: String
+    let subtitle: String
+    let trendValues: [Int]
+    let tint: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(tint.opacity(0.22))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .strokeBorder(tint.opacity(0.28), lineWidth: 1)
+                    )
+
+                Image(systemName: icon)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(tint.opacity(0.94))
+            }
+            .frame(width: 46, height: 46)
+
+            VStack(alignment: .leading, spacing: 7) {
+                Text(appLocalized: title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.58))
+                    .lineLimit(1)
+
+                Text(verbatim: value)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.94))
+                    .monospacedDigit()
+                    .minimumScaleFactor(0.72)
+                    .lineLimit(1)
+
+                Text(appLocalized: subtitle)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.42))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(Color.white.opacity(0.045))
+                .overlay(
+                    SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
+                        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                        .opacity(0.90)
+                )
+                .overlay(alignment: .bottomTrailing) {
+                    AgentUsageSparklineBackdrop(values: trendValues, tint: tint)
+                        .frame(width: 118, height: 58)
+                        .padding(.trailing, 10)
+                        .padding(.bottom, 8)
+                        .opacity(0.82)
+                }
+                .overlay(
+                    LinearGradient(
+                        colors: [
+                            tint.opacity(0.13),
+                            Color.white.opacity(0.035),
+                            Color.black.opacity(0.035)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(tint.opacity(0.18), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.14), radius: 16, y: 8)
+    }
+}
+
+private struct AgentUsageSparklineBackdrop: View {
+    let values: [Int]
+    let tint: Color
+
+    var body: some View {
+        GeometryReader { proxy in
+            let points = normalizedPoints(in: proxy.size)
+            ZStack {
+                if points.count > 1 {
+                    AgentUsageSparklineFill(points: points)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    tint.opacity(0.24),
+                                    tint.opacity(0.05),
+                                    .clear
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+
+                    AgentUsageSparklineStroke(points: points)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    tint.opacity(0.18),
+                                    tint.opacity(0.64),
+                                    tint.opacity(0.24)
+                                ],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ),
+                            style: StrokeStyle(lineWidth: 1.4, lineCap: .round, lineJoin: .round)
+                        )
+                }
+            }
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private func normalizedPoints(in size: CGSize) -> [CGPoint] {
+        let usableValues = values.isEmpty ? [0, 0] : values
+        let maxValue = max(usableValues.max() ?? 0, 1)
+        let minValue = usableValues.min() ?? 0
+        let range = max(maxValue - minValue, 1)
+        let count = max(usableValues.count - 1, 1)
+
+        return usableValues.enumerated().map { index, value in
+            let x = CGFloat(index) / CGFloat(count) * size.width
+            let normalizedY = CGFloat(value - minValue) / CGFloat(range)
+            let y = size.height - normalizedY * (size.height * 0.72) - size.height * 0.10
+            return CGPoint(x: x, y: y)
+        }
+    }
+}
+
+private struct AgentUsageSparklineStroke: Shape {
+    let points: [CGPoint]
+
+    func path(in rect: CGRect) -> Path {
+        smoothPath(points: points)
+    }
+}
+
+private struct AgentUsageSparklineFill: Shape {
+    let points: [CGPoint]
+
+    func path(in rect: CGRect) -> Path {
+        guard let first = points.first, let last = points.last else { return Path() }
+        var path = smoothPath(points: points)
+        path.addLine(to: CGPoint(x: last.x, y: rect.maxY))
+        path.addLine(to: CGPoint(x: first.x, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+}
+
+private func smoothPath(points: [CGPoint]) -> Path {
+    var path = Path()
+    guard let first = points.first else { return path }
+    path.move(to: first)
+
+    guard points.count > 1 else { return path }
+
+    for index in 1..<points.count {
+        let previous = points[index - 1]
+        let current = points[index]
+        let midX = (previous.x + current.x) / 2
+        path.addCurve(
+            to: current,
+            control1: CGPoint(x: midX, y: previous.y),
+            control2: CGPoint(x: midX, y: current.y)
+        )
+    }
+
+    return path
+}
+
+private struct AgentUsageOverviewLine: View {
+    let icon: String
+    let title: String
+    let value: String
+    let subtitle: String
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ZStack {
+                RoundedRectangle(cornerRadius: 9, style: .continuous)
+                    .fill(Color.white.opacity(0.07))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
+                    )
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(.white.opacity(0.72))
+            }
+            .frame(width: 32, height: 32)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(appLocalized: title)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.76))
+                    .lineLimit(1)
+                Text(appLocalized: subtitle)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.42))
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 12)
+
+            Text(verbatim: value)
+                .font(.system(size: 22, weight: .bold, design: .rounded))
+                .foregroundColor(.white.opacity(0.92))
+                .monospacedDigit()
+                .minimumScaleFactor(0.72)
+                .lineLimit(1)
+        }
+        .padding(.vertical, 10)
     }
 }
 
@@ -1071,7 +1441,7 @@ private struct AgentUsageRankingList: View {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     AgentUsageRankingRow(index: index, item: item, tint: tint)
                     if index < items.count - 1 {
-                        SettingsLineDivider()
+                        AgentUsageInsetDivider()
                     }
                 }
             }
@@ -1123,39 +1493,124 @@ private struct AgentUsageRankingRow: View {
 private struct AgentUsageHeatmapView: View {
     let days: [AgentUsageHeatmapDay]
 
-    private let columns = Array(repeating: GridItem(.fixed(11), spacing: 4), count: 7)
+    private let labelColumnWidth: CGFloat = 20
+    private let labelGridSpacing: CGFloat = 8
+    private let monthLabelHeight: CGFloat = 13
+    private let headerHeight: CGFloat = 18
+    private let legendHeight: CGFloat = 14
+    private let calendarHeight: CGFloat = 118
+    private let calendar = Calendar.current
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if days.allSatisfy({ $0.activityCount == 0 }) {
-                AgentUsageEmptyLine(title: "还没有活跃记录")
-            }
+        GeometryReader { proxy in
+            let weekList = weeks
+            let layout = makeLayout(availableWidth: proxy.size.width, weekCount: weekList.count)
 
-            LazyVGrid(columns: columns, alignment: .leading, spacing: 4) {
-                ForEach(days) { day in
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(color(for: day.activityCount))
-                        .frame(width: 11, height: 11)
-                        .help("\(AgentUsageFormat.shortDate(day.date)) · \(day.activityCount)")
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .lastTextBaseline, spacing: 8) {
+                    Text(appLocalized: "活跃热力图")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.70))
+
+                    Text(appLocalized: "最近一年")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.42))
+
+                    if days.allSatisfy({ $0.activityCount == 0 }) {
+                        Text(appLocalized: "还没有活跃记录")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(.white.opacity(0.40))
+                    }
+
+                    Spacer(minLength: 0)
                 }
+                .frame(height: headerHeight)
+
+                HStack(alignment: .top, spacing: labelGridSpacing) {
+                    weekdayLabels(layout: layout)
+                    VStack(alignment: .leading, spacing: 6) {
+                        monthLabels(weeks: weekList, layout: layout)
+                        heatmapGrid(weeks: weekList, layout: layout)
+                    }
+                    .frame(width: layout.gridWidth, alignment: .leading)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                heatmapLegend(layout: layout)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(height: calendarHeight)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 2)
+    }
 
-            HStack(spacing: 5) {
-                Text(appLocalized: "少")
+    private func weekdayLabels(layout: HeatmapLayout) -> some View {
+        VStack(alignment: .trailing, spacing: layout.cellSpacing) {
+            ForEach(0..<7, id: \.self) { weekday in
+                Text(appLocalized: weekdayLabel(for: weekday))
                     .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.38))
-                ForEach(0..<5, id: \.self) { level in
-                    RoundedRectangle(cornerRadius: 2, style: .continuous)
-                        .fill(color(forLevel: level))
-                        .frame(width: 10, height: 10)
-                }
-                Text(appLocalized: "多")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(.white.opacity(0.38))
+                    .foregroundColor(.white.opacity(weekdayLabel(for: weekday).isEmpty ? 0 : 0.46))
+                    .frame(width: labelColumnWidth, height: layout.cellSize, alignment: .trailing)
             }
         }
-        .padding(.vertical, 12)
+    }
+
+    private func monthLabels(weeks: [HeatmapWeek], layout: HeatmapLayout) -> some View {
+        ZStack(alignment: .topLeading) {
+            ForEach(monthMarkers(for: weeks, layout: layout)) { marker in
+                Text(verbatim: marker.label)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.white.opacity(0.62))
+                    .frame(width: marker.width, alignment: .leading)
+                    .offset(x: marker.x)
+            }
+        }
+        .frame(width: layout.gridWidth, height: monthLabelHeight, alignment: .topLeading)
+        .clipped()
+    }
+
+    private func heatmapGrid(weeks: [HeatmapWeek], layout: HeatmapLayout) -> some View {
+        HStack(alignment: .top, spacing: layout.cellSpacing) {
+            ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
+                VStack(spacing: layout.cellSpacing) {
+                    ForEach(0..<7, id: \.self) { weekday in
+                        if let day = week.days[weekday] {
+                            RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
+                                .fill(color(for: day.activityCount))
+                                .frame(width: layout.cellSize, height: layout.cellSize)
+                                .help("\(AgentUsageFormat.shortDate(day.date)) · \(day.activityCount)")
+                        } else {
+                            RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
+                                .fill(Color.clear)
+                                .frame(width: layout.cellSize, height: layout.cellSize)
+                        }
+                    }
+                }
+            }
+        }
+        .frame(width: layout.gridWidth, alignment: .leading)
+    }
+
+    private func heatmapLegend(layout: HeatmapLayout) -> some View {
+        HStack(spacing: 5) {
+            Spacer(minLength: labelColumnWidth + labelGridSpacing)
+
+            Spacer(minLength: 0)
+
+            Text(appLocalized: "少")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white.opacity(0.42))
+            ForEach(0..<5, id: \.self) { level in
+                RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
+                    .fill(color(forLevel: level))
+                    .frame(width: layout.cellSize, height: layout.cellSize)
+            }
+            Text(appLocalized: "多")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(.white.opacity(0.42))
+        }
+        .frame(height: legendHeight)
     }
 
     private func color(for count: Int) -> Color {
@@ -1174,6 +1629,111 @@ private struct AgentUsageHeatmapView: View {
         case 3: return TerminalColors.green.opacity(0.66)
         default: return TerminalColors.green.opacity(0.92)
         }
+    }
+
+    private var weeks: [HeatmapWeek] {
+        guard let firstDay = days.first else { return [] }
+
+        var result: [HeatmapWeek] = []
+        var currentWeek = HeatmapWeek(startDate: weekStart(for: firstDay.date), days: Array(repeating: nil, count: 7))
+
+        for day in days {
+            let dayWeekStart = weekStart(for: day.date)
+            if !calendar.isDate(dayWeekStart, inSameDayAs: currentWeek.startDate) {
+                result.append(currentWeek)
+                currentWeek = HeatmapWeek(startDate: dayWeekStart, days: Array(repeating: nil, count: 7))
+            }
+
+            currentWeek.days[weekdayIndex(for: day.date)] = day
+        }
+
+        result.append(currentWeek)
+        return result
+    }
+
+    private func weekdayIndex(for date: Date) -> Int {
+        let weekday = calendar.component(.weekday, from: date)
+        return (weekday + 5) % 7
+    }
+
+    private func weekStart(for date: Date) -> Date {
+        let startOfDay = calendar.startOfDay(for: date)
+        let daysFromMonday = weekdayIndex(for: startOfDay)
+        return calendar.date(byAdding: .day, value: -daysFromMonday, to: startOfDay) ?? startOfDay
+    }
+
+    private func weekdayLabel(for index: Int) -> String {
+        switch index {
+        case 0: return "一"
+        case 2: return "三"
+        case 4: return "五"
+        default: return ""
+        }
+    }
+
+    private func monthLabel(for week: HeatmapWeek, at index: Int) -> String {
+        guard let visibleDay = week.days.compactMap({ $0 }).first else { return "" }
+        if index == 0 || calendar.component(.day, from: visibleDay.date) <= 7 {
+            return AgentUsageFormat.shortMonth(visibleDay.date)
+        }
+        return ""
+    }
+
+    private func monthMarkers(for weeks: [HeatmapWeek], layout: HeatmapLayout) -> [MonthMarker] {
+        Array(weeks.enumerated()).compactMap { index, week in
+            let label = monthLabel(for: week, at: index)
+            guard !label.isEmpty else { return nil }
+
+            let preferredWidth: CGFloat = 26
+            let x = min(layout.xOffset(forWeekAt: index), max(0, layout.gridWidth - preferredWidth))
+            return MonthMarker(id: index, label: label, x: x, width: preferredWidth)
+        }
+    }
+
+    private func makeLayout(availableWidth: CGFloat, weekCount: Int) -> HeatmapLayout {
+        let resolvedWeekCount = max(1, weekCount)
+        let availableGridWidth = max(160, availableWidth - labelColumnWidth - labelGridSpacing)
+        let preferredSpacing: CGFloat = availableGridWidth < 430 ? 1.5 : 2.5
+        let rawCellSize = (availableGridWidth - CGFloat(resolvedWeekCount - 1) * preferredSpacing) / CGFloat(resolvedWeekCount)
+        let cellSize = min(8, max(4.5, rawCellSize))
+        let gridWidth = CGFloat(resolvedWeekCount) * cellSize + CGFloat(resolvedWeekCount - 1) * preferredSpacing
+
+        return HeatmapLayout(
+            cellSize: cellSize,
+            cellSpacing: preferredSpacing,
+            gridWidth: gridWidth,
+            cornerRadius: min(2.5, cellSize * 0.32)
+        )
+    }
+
+    private struct HeatmapLayout {
+        let cellSize: CGFloat
+        let cellSpacing: CGFloat
+        let gridWidth: CGFloat
+        let cornerRadius: CGFloat
+
+        func xOffset(forWeekAt index: Int) -> CGFloat {
+            CGFloat(index) * (cellSize + cellSpacing)
+        }
+    }
+
+    private struct MonthMarker: Identifiable {
+        let id: Int
+        let label: String
+        let x: CGFloat
+        let width: CGFloat
+    }
+
+    private struct HeatmapWeek {
+        let startDate: Date
+        var days: [AgentUsageHeatmapDay?]
+    }
+}
+
+private struct AgentUsageInsetDivider: View {
+    var body: some View {
+        Divider()
+            .overlay(Color.white.opacity(0.10))
     }
 }
 
@@ -1206,6 +1766,12 @@ private enum AgentUsageFormat {
         return formatter
     }()
 
+    private static let shortMonthFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM"
+        return formatter
+    }()
+
     static func integer(_ value: Int) -> String {
         integerFormatter.string(from: NSNumber(value: value)) ?? "\(value)"
     }
@@ -1222,6 +1788,10 @@ private enum AgentUsageFormat {
 
     static func shortDate(_ date: Date) -> String {
         shortDateFormatter.string(from: date)
+    }
+
+    static func shortMonth(_ date: Date) -> String {
+        shortMonthFormatter.string(from: date)
     }
 }
 
@@ -2097,8 +2667,25 @@ private struct SettingsPanelContentView: View {
                     step: 10,
                     format: { "\($0.formatted(.number.precision(.fractionLength(0)))) pt" }
                 )
+                SettingsLineDivider()
+
+                SettingsInfoLine(
+                    title: "设置面板大小",
+                    subtitle: "将设置面板恢复到默认宽高，适合窗口被拉大或缩小时快速回到推荐布局。"
+                ) {
+                    HookManagementButton(
+                        title: "重置",
+                        tint: SettingsCategory.display.tint,
+                        action: resetSettingsPanelSize
+                    )
+                }
             }
         }
+    }
+
+    private func resetSettingsPanelSize() {
+        guard presentation == .window else { return }
+        SettingsWindowLayout.resetContentSize(of: currentWindow)
     }
 
     private func replayNotchDetachmentHint() {
@@ -2892,14 +3479,39 @@ private struct WindowControlButton: View {
 
 private struct SettingsSectionCard<Content: View>: View {
     let title: String
-    @ViewBuilder let content: Content
+    private let titleAccessory: AnyView?
+    private let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.titleAccessory = nil
+        self.content = content()
+    }
+
+    init<Accessory: View>(
+        title: String,
+        @ViewBuilder titleAccessory: () -> Accessory,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.titleAccessory = AnyView(titleAccessory())
+        self.content = content()
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(appLocalized: title)
-                .font(.system(size: 15, weight: .bold))
-                .foregroundColor(.white)
-                .padding(.bottom, 10)
+            HStack(alignment: .center, spacing: 12) {
+                Text(appLocalized: title)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundColor(.white)
+
+                Spacer(minLength: 12)
+
+                if let titleAccessory {
+                    titleAccessory
+                }
+            }
+            .padding(.bottom, 10)
 
             VStack(spacing: 0) {
                 content

@@ -92,6 +92,22 @@ final class SettingsWindowControllerTests: XCTestCase {
         controller.dismiss()
     }
 
+    func testResetToDefaultContentSizeRestoresResizedSettingsWindow() throws {
+        let controller = SettingsWindowController.shared
+        controller.dismiss()
+        defer { controller.dismiss() }
+
+        controller.present()
+        let window = try XCTUnwrap(controller.window)
+        window.setContentSize(NSSize(width: 1000, height: 600))
+
+        controller.resetToDefaultContentSize()
+
+        let contentSize = window.contentRect(forFrameRect: window.frame).size
+        XCTAssertEqual(contentSize.width, SettingsWindowDefaults.defaultContentSize.width)
+        XCTAssertEqual(contentSize.height, SettingsWindowDefaults.defaultContentSize.height)
+    }
+
     func testSettingsWindowPublishesVisibilityChanges() {
         let controller = SettingsWindowController.shared
         controller.dismiss()
