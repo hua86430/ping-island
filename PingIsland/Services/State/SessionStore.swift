@@ -308,6 +308,7 @@ actor SessionStore {
         sessions[handle.sessionID] = session
         Task {
             await TelemetryService.shared.recordSessionDetected(session)
+            await AgentUsageStore.shared.recordSessionActivity(session)
         }
     }
 
@@ -341,6 +342,7 @@ actor SessionStore {
         sessions[info.sessionId] = session
         Task {
             await TelemetryService.shared.recordSessionDetected(session)
+            await AgentUsageStore.shared.recordSessionActivity(session)
         }
     }
 
@@ -524,6 +526,7 @@ actor SessionStore {
             Task {
                 await TelemetryService.shared.recordSessionCompleted(session)
             }
+            await AgentUsageStore.shared.recordHookEvent(event, resolvedSessionID: sessionId)
             return
         }
 
@@ -673,6 +676,8 @@ actor SessionStore {
         updateQoderConversationPoll(for: session, event: event)
         updateOpenClawConversationPoll(for: session, event: event)
         updateCodeBuddyCLIQuestionPoll(for: session, event: event)
+
+        await AgentUsageStore.shared.recordHookEvent(event, resolvedSessionID: sessionId)
 
         if event.shouldSyncFile {
             scheduleFileSync(
@@ -1370,6 +1375,9 @@ actor SessionStore {
         guard var session = sessions[sessionId] else { return }
         session.subagentState.addSubagentTool(tool)
         sessions[sessionId] = session
+        Task {
+            await AgentUsageStore.shared.recordSubagentTool(sessionID: sessionId, tool: tool)
+        }
     }
 
     /// Handle subagent tool completed event
@@ -1950,6 +1958,8 @@ actor SessionStore {
 
         sessions[payload.sessionId] = session
         publishState()
+
+        await AgentUsageStore.shared.recordFileUpdate(session: session, payload: payload)
 
         await emitToolCompletionEvents(
             sessionId: payload.sessionId,
@@ -2690,6 +2700,18 @@ actor SessionStore {
         await refreshQoderFallbackSubagentPresentation(for: sessionId, session: &session)
 
         sessions[sessionId] = session
+        await AgentUsageStore.shared.recordFileUpdate(
+            session: session,
+            payload: FileUpdatePayload(
+                sessionId: sessionId,
+                cwd: session.cwd,
+                messages: messages,
+                isIncremental: false,
+                completedToolIds: completedTools,
+                toolResults: toolResults,
+                structuredResults: structuredResults
+            )
+        )
     }
 
     // MARK: - File Sync Scheduling
