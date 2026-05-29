@@ -70,7 +70,7 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(snapshot.topAgents.map(\.count), [2, 1])
         XCTAssertEqual(snapshot.topTools.map(\.name), ["Read", "Bash"])
         XCTAssertEqual(snapshot.topTools.map(\.count), [4, 2])
-        XCTAssertEqual(snapshot.heatmapDays.count, 365)
+        XCTAssertEqual(snapshot.heatmapDays.count, 180)
         XCTAssertEqual(snapshot.heatmapDays.last?.activityCount, 8)
         XCTAssertEqual(
             snapshot.heatmapDays.first { AgentUsageStore.dayKey(for: $0.date, calendar: calendar) == older }?.activityCount,
@@ -81,6 +81,67 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(snapshot.trendPoints.last?.agentCount, 2)
         XCTAssertEqual(snapshot.trendPoints.last?.toolUseCount, 5)
         XCTAssertEqual(snapshot.trendPoints.last?.sessionCount, 3)
+        XCTAssertEqual(snapshot.spendSummary.dailyPoints.count, 30)
+        XCTAssertEqual(snapshot.spendSummary.today.tokenTotals, AgentUsageTokenTotals(input: 100, output: 50, total: 150))
+        XCTAssertEqual(snapshot.spendSummary.sevenDays.tokenTotals, AgentUsageTokenTotals(input: 140, output: 60, total: 200))
+        XCTAssertEqual(snapshot.spendSummary.thirtyDays.tokenTotals, AgentUsageTokenTotals(input: 1_140, output: 1_060, total: 2_200))
+        XCTAssertEqual(
+            snapshot.spendSummary.sevenDays.estimatedUSD,
+            AgentUsageCostEstimator.estimateUSD(for: AgentUsageTokenTotals(input: 140, output: 60, total: 200)),
+            accuracy: 0.000_001
+        )
+        XCTAssertEqual(snapshot.spendSummary.dailyPoints.last?.tokenTotal, 150)
+    }
+
+    func testCostEstimatorUsesBlendedCodexClaudePricing() {
+        let cost = AgentUsageCostEstimator.estimateUSD(
+            for: AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000, total: 2_000_000)
+        )
+
+        XCTAssertEqual(cost, 16.875, accuracy: 0.000_001)
+    }
+
+    func testSnapshotRankingsAreLimitedToTopFive() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_775_520_000)
+        let today = AgentUsageStore.dayKey(for: now, calendar: calendar)
+
+        let document = AgentUsageDocument(
+            buckets: [
+                today: AgentUsageDailyBucket(
+                    day: today,
+                    sessionIDsByAgent: [
+                        "Agent 1": ["a1"],
+                        "Agent 2": ["a2"],
+                        "Agent 3": ["a3"],
+                        "Agent 4": ["a4"],
+                        "Agent 5": ["a5"],
+                        "Agent 6": ["a6"],
+                    ],
+                    toolCounts: [
+                        "Tool 1": 60,
+                        "Tool 2": 50,
+                        "Tool 3": 40,
+                        "Tool 4": 30,
+                        "Tool 5": 20,
+                        "Tool 6": 10,
+                    ]
+                ),
+            ]
+        )
+
+        let snapshot = AgentUsageStore.makeSnapshot(
+            range: .today,
+            document: document,
+            now: now,
+            calendar: calendar
+        )
+
+        XCTAssertEqual(snapshot.topAgents.count, 5)
+        XCTAssertEqual(snapshot.topTools.count, 5)
+        XCTAssertFalse(snapshot.topAgents.map(\.name).contains("Agent 6"))
+        XCTAssertFalse(snapshot.topTools.map(\.name).contains("Tool 6"))
     }
 
     func testRecordCodexUsageSnapshotStoresOnlyPositiveDeltas() async throws {

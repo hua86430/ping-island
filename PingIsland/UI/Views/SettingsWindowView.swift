@@ -909,6 +909,10 @@ private struct AgentUsageAnalyticsContent: View {
 
             AgentUsageSummaryCards(snapshot: viewModel.snapshot)
 
+            spendCard
+
+            activityMapCard
+
             overviewCard
 
             ViewThatFits(in: .horizontal) {
@@ -948,6 +952,22 @@ private struct AgentUsageAnalyticsContent: View {
         }
         .onAppear {
             viewModel.refresh()
+        }
+    }
+
+    private var activityMapCard: some View {
+        SettingsSectionCard(title: "活跃地图") {
+            AgentUsageHeatmapView(days: viewModel.snapshot.heatmapDays)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 16)
+        }
+    }
+
+    private var spendCard: some View {
+        SettingsSectionCard(title: "Token 费用预估") {
+            AgentUsageSpendPanel(summary: viewModel.snapshot.spendSummary)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 16)
         }
     }
 
@@ -1022,7 +1042,7 @@ private struct AgentUsageRangeControl: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            Picker("统计范围", selection: Binding(
+            Picker(AppLocalization.string("统计范围"), selection: Binding(
                 get: { selectedRange },
                 set: { selectRange($0) }
             )) {
@@ -1042,7 +1062,7 @@ private struct AgentUsageRangeControl: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help("刷新本地统计")
+            .help(AppLocalization.string("刷新本地统计"))
         }
     }
 }
@@ -1095,7 +1115,11 @@ private struct AgentUsageSummaryCards: View {
             icon: "cube.transparent",
             title: "Token 消耗",
             value: AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.resolvedTotal),
-            subtitle: "输入 \(AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.input)) / 输出 \(AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.output))",
+            subtitle: AppLocalization.format(
+                "输入 %@ / 输出 %@",
+                AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.input),
+                AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.output)
+            ),
             trendValues: snapshot.trendPoints.map(\.tokenTotal),
             tint: SettingsCategory.analytics.tint
         )
@@ -1215,6 +1239,135 @@ private struct AgentUsageSummaryCard: View {
                 .strokeBorder(tint.opacity(0.18), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.14), radius: 16, y: 8)
+    }
+}
+
+private struct AgentUsageSpendPanel: View {
+    let summary: AgentUsageSpendSummary
+
+    private let columns = [
+        GridItem(.flexible(minimum: 132), spacing: 14),
+        GridItem(.flexible(minimum: 132), spacing: 14),
+        GridItem(.flexible(minimum: 132), spacing: 14),
+    ]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 14) {
+                AgentUsageSpendMetricTile(title: "今日", metric: summary.today)
+                AgentUsageSpendMetricTile(title: "7 天费用", metric: summary.sevenDays)
+                AgentUsageSpendMetricTile(title: "30 天费用", metric: summary.thirtyDays)
+            }
+
+            AgentUsageSpendBarChart(points: summary.dailyPoints)
+                .frame(height: 104)
+                .padding(.top, 2)
+
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(verbatim: AppLocalization.format(
+                    "30 天：%@ Tokens",
+                    AgentUsageFormat.compactTokenCount(summary.thirtyDays.tokenTotals.resolvedTotal)
+                ))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.80))
+                    .monospacedDigit()
+
+                Text(verbatim: AppLocalization.format(
+                    "· %@ 预估",
+                    AgentUsageFormat.usd(summary.thirtyDays.estimatedUSD)
+                ))
+                    .font(.system(size: 12, weight: .bold, design: .rounded))
+                    .foregroundColor(TerminalColors.blue.opacity(0.92))
+                    .monospacedDigit()
+
+                Spacer(minLength: 8)
+
+                Text(appLocalized: AgentUsageCostEstimator.blendedCodexClaudePricing.label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.42))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct AgentUsageSpendMetricTile: View {
+    let title: String
+    let metric: AgentUsageCostMetric
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(appLocalized: title)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.58))
+                .lineLimit(1)
+
+            Text(verbatim: AgentUsageFormat.usd(metric.estimatedUSD))
+                .font(.system(size: 24, weight: .bold, design: .rounded))
+                .foregroundColor(.white.opacity(0.94))
+                .monospacedDigit()
+                .minimumScaleFactor(0.70)
+                .lineLimit(1)
+
+            Text(verbatim: AppLocalization.format(
+                "%@ Tokens",
+                AgentUsageFormat.compactTokenCount(metric.tokenTotals.resolvedTotal)
+            ))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.42))
+                .lineLimit(1)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+private struct AgentUsageSpendBarChart: View {
+    let points: [AgentUsageDailySpendPoint]
+
+    var body: some View {
+        GeometryReader { proxy in
+            let maxTokens = max(points.map(\.tokenTotal).max() ?? 0, 1)
+            let barSpacing: CGFloat = 4
+            let barWidth = max(4, (proxy.size.width - CGFloat(max(points.count - 1, 0)) * barSpacing) / CGFloat(max(points.count, 1)))
+
+            HStack(alignment: .bottom, spacing: barSpacing) {
+                ForEach(points) { point in
+                    let tokenShare = CGFloat(point.tokenTotal) / CGFloat(maxTokens)
+                    let barHeight = max(point.tokenTotal > 0 ? 5 : 2, proxy.size.height * max(0.02, tokenShare))
+
+                    RoundedRectangle(cornerRadius: min(4, barWidth * 0.45), style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: point.tokenTotal > 0 ? [
+                                    Color.white.opacity(0.92),
+                                    TerminalColors.blue.opacity(0.58),
+                                    TerminalColors.blue.opacity(0.78)
+                                ] : [
+                                    Color.white.opacity(0.18),
+                                    Color.white.opacity(0.10)
+                                ],
+                                startPoint: .top,
+                                endPoint: .bottom
+                            )
+                        )
+                        .overlay(alignment: .top) {
+                            RoundedRectangle(cornerRadius: min(4, barWidth * 0.45), style: .continuous)
+                                .fill(Color.white.opacity(point.tokenTotal > 0 ? 0.18 : 0.05))
+                                .frame(height: min(5, max(2, barHeight * 0.28)))
+                        }
+                        .frame(width: barWidth, height: barHeight)
+                        .help(AppLocalization.format(
+                            "%@ · %@ Tokens · %@",
+                            AgentUsageFormat.shortDate(point.date),
+                            AgentUsageFormat.compactTokenCount(point.tokenTotal),
+                            AgentUsageFormat.usd(point.estimatedUSD)
+                        ))
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+        }
+        .accessibilityHidden(true)
     }
 }
 
@@ -1499,12 +1652,12 @@ private struct AgentUsageRankingRow: View {
 private struct AgentUsageHeatmapView: View {
     let days: [AgentUsageHeatmapDay]
 
-    private let labelColumnWidth: CGFloat = 20
-    private let labelGridSpacing: CGFloat = 8
+    private let labelColumnWidth: CGFloat = 22
+    private let labelGridSpacing: CGFloat = 10
     private let monthLabelHeight: CGFloat = 13
-    private let headerHeight: CGFloat = 18
+    private let headerHeight: CGFloat = 30
     private let legendHeight: CGFloat = 14
-    private let calendarHeight: CGFloat = 118
+    private let calendarHeight: CGFloat = 178
     private let calendar = Calendar.current
 
     var body: some View {
@@ -1513,36 +1666,18 @@ private struct AgentUsageHeatmapView: View {
             let layout = makeLayout(availableWidth: proxy.size.width, weekCount: weekList.count)
 
             VStack(alignment: .leading, spacing: 10) {
-                HStack(alignment: .lastTextBaseline, spacing: 8) {
-                    Text(appLocalized: "活跃热力图")
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.70))
-
-                    Text(appLocalized: "最近一年")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.42))
-
-                    if days.allSatisfy({ $0.activityCount == 0 }) {
-                        Text(appLocalized: "还没有活跃记录")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.white.opacity(0.40))
-                    }
-
-                    Spacer(minLength: 0)
-                }
+                heatmapHeader(layout: layout)
                 .frame(height: headerHeight)
 
                 HStack(alignment: .top, spacing: labelGridSpacing) {
                     weekdayLabels(layout: layout)
                     VStack(alignment: .leading, spacing: 6) {
-                        monthLabels(weeks: weekList, layout: layout)
                         heatmapGrid(weeks: weekList, layout: layout)
+                        monthLabels(weeks: weekList, layout: layout)
                     }
                     .frame(width: layout.gridWidth, alignment: .leading)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                heatmapLegend(layout: layout)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -1551,8 +1686,30 @@ private struct AgentUsageHeatmapView: View {
         .padding(.top, 2)
     }
 
+    private func heatmapHeader(layout: HeatmapLayout) -> some View {
+        HStack(alignment: .lastTextBaseline, spacing: 8) {
+            Text(appLocalized: "最近 6 个月")
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(.white.opacity(0.70))
+
+            Text(appLocalized: "每日活跃记录")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.42))
+
+            if days.allSatisfy({ $0.activityCount == 0 }) {
+                Text(appLocalized: "还没有活跃记录")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(.white.opacity(0.40))
+            }
+
+            Spacer(minLength: 0)
+
+            heatmapLegend(layout: layout)
+        }
+    }
+
     private func weekdayLabels(layout: HeatmapLayout) -> some View {
-        VStack(alignment: .trailing, spacing: layout.cellSpacing) {
+        VStack(alignment: .trailing, spacing: layout.rowSpacing) {
             ForEach(0..<7, id: \.self) { weekday in
                 Text(appLocalized: weekdayLabel(for: weekday))
                     .font(.system(size: 10, weight: .medium))
@@ -1577,15 +1734,24 @@ private struct AgentUsageHeatmapView: View {
     }
 
     private func heatmapGrid(weeks: [HeatmapWeek], layout: HeatmapLayout) -> some View {
-        HStack(alignment: .top, spacing: layout.cellSpacing) {
+        HStack(alignment: .top, spacing: layout.columnSpacing) {
             ForEach(Array(weeks.enumerated()), id: \.offset) { _, week in
-                VStack(spacing: layout.cellSpacing) {
+                VStack(spacing: layout.rowSpacing) {
                     ForEach(0..<7, id: \.self) { weekday in
                         if let day = week.days[weekday] {
                             RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
-                                .fill(color(for: day.activityCount))
+                                .fill(heatmapGradient(for: day.activityCount))
+                                .overlay(alignment: .top) {
+                                    RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
+                                        .fill(Color.white.opacity(day.activityCount > 0 ? 0.13 : 0.04))
+                                        .frame(height: max(1, layout.cellSize * 0.24))
+                                }
                                 .frame(width: layout.cellSize, height: layout.cellSize)
-                                .help("\(AgentUsageFormat.shortDate(day.date)) · \(day.activityCount)")
+                                .help(AppLocalization.format(
+                                    "%@ · %@ 条活跃记录",
+                                    AgentUsageFormat.shortDate(day.date),
+                                    AgentUsageFormat.integer(day.activityCount)
+                                ))
                         } else {
                             RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
                                 .fill(Color.clear)
@@ -1600,23 +1766,45 @@ private struct AgentUsageHeatmapView: View {
 
     private func heatmapLegend(layout: HeatmapLayout) -> some View {
         HStack(spacing: 5) {
-            Spacer(minLength: labelColumnWidth + labelGridSpacing)
-
-            Spacer(minLength: 0)
-
-            Text(appLocalized: "少")
+            Text(appLocalized: "低")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.white.opacity(0.42))
             ForEach(0..<5, id: \.self) { level in
                 RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
-                    .fill(color(forLevel: level))
+                    .fill(heatmapGradient(forLevel: level))
+                    .overlay(alignment: .top) {
+                        RoundedRectangle(cornerRadius: layout.cornerRadius, style: .continuous)
+                            .fill(Color.white.opacity(level > 0 ? 0.13 : 0.04))
+                            .frame(height: max(1, layout.cellSize * 0.24))
+                    }
                     .frame(width: layout.cellSize, height: layout.cellSize)
             }
-            Text(appLocalized: "多")
+            Text(appLocalized: "高")
                 .font(.system(size: 10, weight: .medium))
                 .foregroundColor(.white.opacity(0.42))
         }
         .frame(height: legendHeight)
+    }
+
+    private func heatmapGradient(for count: Int) -> LinearGradient {
+        if count <= 0 { return heatmapGradient(forLevel: 0) }
+        if count < 3 { return heatmapGradient(forLevel: 1) }
+        if count < 8 { return heatmapGradient(forLevel: 2) }
+        if count < 16 { return heatmapGradient(forLevel: 3) }
+        return heatmapGradient(forLevel: 4)
+    }
+
+    private func heatmapGradient(forLevel level: Int) -> LinearGradient {
+        let base = color(forLevel: level)
+        return LinearGradient(
+            colors: [
+                Color.white.opacity(level > 0 ? 0.18 : 0.05),
+                base.opacity(level > 0 ? 0.95 : 0.78),
+                base
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
     }
 
     private func color(for count: Int) -> Color {
@@ -1630,10 +1818,10 @@ private struct AgentUsageHeatmapView: View {
     private func color(forLevel level: Int) -> Color {
         switch level {
         case 0: return Color.white.opacity(0.08)
-        case 1: return TerminalColors.green.opacity(0.28)
-        case 2: return TerminalColors.green.opacity(0.46)
-        case 3: return TerminalColors.green.opacity(0.66)
-        default: return TerminalColors.green.opacity(0.92)
+        case 1: return TerminalColors.cyan.opacity(0.34)
+        case 2: return TerminalColors.cyan.opacity(0.58)
+        case 3: return TerminalColors.blue.opacity(0.72)
+        default: return TerminalColors.blue.opacity(0.95)
         }
     }
 
@@ -1699,27 +1887,46 @@ private struct AgentUsageHeatmapView: View {
     private func makeLayout(availableWidth: CGFloat, weekCount: Int) -> HeatmapLayout {
         let resolvedWeekCount = max(1, weekCount)
         let availableGridWidth = max(160, availableWidth - labelColumnWidth - labelGridSpacing)
-        let preferredSpacing: CGFloat = availableGridWidth < 430 ? 1.5 : 2.5
-        let rawCellSize = (availableGridWidth - CGFloat(resolvedWeekCount - 1) * preferredSpacing) / CGFloat(resolvedWeekCount)
-        let cellSize = min(8, max(4.5, rawCellSize))
-        let gridWidth = CGFloat(resolvedWeekCount) * cellSize + CGFloat(resolvedWeekCount - 1) * preferredSpacing
+        let preferredCellSize: CGFloat
+        if availableGridWidth >= 640 {
+            preferredCellSize = 16
+        } else if availableGridWidth >= 430 {
+            preferredCellSize = 14
+        } else {
+            preferredCellSize = 11
+        }
+        let minimumColumnSpacing: CGFloat = availableGridWidth < 430 ? 2 : 4
+        let cellSize = min(
+            preferredCellSize,
+            max(6, (availableGridWidth - CGFloat(resolvedWeekCount - 1) * minimumColumnSpacing) / CGFloat(resolvedWeekCount))
+        )
+        let columnSpacing = resolvedWeekCount > 1
+            ? max(
+                minimumColumnSpacing,
+                (availableGridWidth - CGFloat(resolvedWeekCount) * cellSize) / CGFloat(resolvedWeekCount - 1)
+            )
+            : 0
+        let rowSpacing = min(6, max(3, cellSize * 0.30))
+        let gridWidth = CGFloat(resolvedWeekCount) * cellSize + CGFloat(resolvedWeekCount - 1) * columnSpacing
 
         return HeatmapLayout(
             cellSize: cellSize,
-            cellSpacing: preferredSpacing,
+            columnSpacing: columnSpacing,
+            rowSpacing: rowSpacing,
             gridWidth: gridWidth,
-            cornerRadius: min(2.5, cellSize * 0.32)
+            cornerRadius: min(3.5, cellSize * 0.32)
         )
     }
 
     private struct HeatmapLayout {
         let cellSize: CGFloat
-        let cellSpacing: CGFloat
+        let columnSpacing: CGFloat
+        let rowSpacing: CGFloat
         let gridWidth: CGFloat
         let cornerRadius: CGFloat
 
         func xOffset(forWeekAt index: Int) -> CGFloat {
-            CGFloat(index) * (cellSize + cellSpacing)
+            CGFloat(index) * (cellSize + columnSpacing)
         }
     }
 
@@ -1766,6 +1973,16 @@ private enum AgentUsageFormat {
         return formatter
     }()
 
+    private static let usdFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "USD"
+        formatter.currencySymbol = "$"
+        formatter.minimumFractionDigits = 2
+        formatter.maximumFractionDigits = 2
+        return formatter
+    }()
+
     private static let shortDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateFormat = "M/d"
@@ -1790,6 +2007,13 @@ private enum AgentUsageFormat {
             return String(format: "%.1fK", Double(value) / 1_000)
         }
         return integer(value)
+    }
+
+    static func usd(_ value: Double) -> String {
+        if value > 0, value < 0.01 {
+            return String(format: "$%.4f", value)
+        }
+        return usdFormatter.string(from: NSNumber(value: value)) ?? String(format: "$%.2f", value)
     }
 
     static func shortDate(_ date: Date) -> String {

@@ -80,9 +80,64 @@ struct AgentUsageTrendPoint: Equatable, Identifiable, Sendable {
     nonisolated var id: Date { date }
 }
 
+struct AgentUsageCostMetric: Equatable, Identifiable, Sendable {
+    let range: AgentUsageRange
+    let tokenTotals: AgentUsageTokenTotals
+    let estimatedUSD: Double
+
+    nonisolated var id: AgentUsageRange { range }
+}
+
+struct AgentUsageDailySpendPoint: Equatable, Identifiable, Sendable {
+    let date: Date
+    let tokenTotals: AgentUsageTokenTotals
+    let estimatedUSD: Double
+
+    nonisolated var id: Date { date }
+    nonisolated var tokenTotal: Int { tokenTotals.resolvedTotal }
+}
+
+struct AgentUsageSpendSummary: Equatable, Sendable {
+    let today: AgentUsageCostMetric
+    let sevenDays: AgentUsageCostMetric
+    let thirtyDays: AgentUsageCostMetric
+    let dailyPoints: [AgentUsageDailySpendPoint]
+
+    nonisolated var metrics: [AgentUsageCostMetric] {
+        [today, sevenDays, thirtyDays]
+    }
+}
+
+struct AgentUsageTokenPricing: Equatable, Sendable {
+    let inputUSDPerMillion: Double
+    let outputUSDPerMillion: Double
+    let label: String
+
+    nonisolated func estimateUSD(for totals: AgentUsageTokenTotals) -> Double {
+        (Double(totals.input) / 1_000_000 * inputUSDPerMillion)
+            + (Double(totals.output) / 1_000_000 * outputUSDPerMillion)
+    }
+}
+
+enum AgentUsageCostEstimator {
+    nonisolated static let blendedCodexClaudePricing = AgentUsageTokenPricing(
+        inputUSDPerMillion: 2.375,
+        outputUSDPerMillion: 14.50,
+        label: "Codex / Claude Code 均价"
+    )
+
+    nonisolated static func estimateUSD(
+        for totals: AgentUsageTokenTotals,
+        pricing: AgentUsageTokenPricing = blendedCodexClaudePricing
+    ) -> Double {
+        pricing.estimateUSD(for: totals)
+    }
+}
+
 struct AgentUsageDashboardSnapshot: Equatable, Sendable {
-    private nonisolated static let annualHeatmapDayCount = 365
+    private nonisolated static let heatmapDayCount = 180
     private nonisolated static let trendDayCount = 7
+    private nonisolated static let spendDayCount = 30
 
     let range: AgentUsageRange
     let sessionCount: Int
@@ -92,6 +147,7 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
     let topTools: [AgentUsageRankItem]
     let heatmapDays: [AgentUsageHeatmapDay]
     let trendPoints: [AgentUsageTrendPoint]
+    let spendSummary: AgentUsageSpendSummary
 
     nonisolated static func empty(range: AgentUsageRange, now: Date = Date(), calendar: Calendar = .current) -> AgentUsageDashboardSnapshot {
         AgentUsageDashboardSnapshot(
@@ -101,8 +157,9 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
             tokenTotals: AgentUsageTokenTotals(),
             topAgents: [],
             topTools: [],
-            heatmapDays: annualHeatmapDays(now: now, buckets: [:], calendar: calendar),
-            trendPoints: trendPoints(now: now, buckets: [:], calendar: calendar)
+            heatmapDays: recentHeatmapDays(now: now, buckets: [:], calendar: calendar),
+            trendPoints: trendPoints(now: now, buckets: [:], calendar: calendar),
+            spendSummary: Self.spendSummary(now: now, buckets: [:], calendar: calendar)
         )
     }
 
@@ -110,14 +167,14 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
         sessionCount > 0 || toolUseCount > 0 || tokenTotals.resolvedTotal > 0
     }
 
-    fileprivate nonisolated static func annualHeatmapDays(
+    fileprivate nonisolated static func recentHeatmapDays(
         now: Date,
         buckets: [String: AgentUsageDailyBucket],
         calendar: Calendar
     ) -> [AgentUsageHeatmapDay] {
         let today = calendar.startOfDay(for: now)
 
-        return (0..<annualHeatmapDayCount).reversed().compactMap { offset in
+        return (0..<heatmapDayCount).reversed().compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
                 return nil
             }
@@ -148,6 +205,79 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
                 sessionCount: sessionCount
             )
         }
+    }
+
+    fileprivate nonisolated static func spendSummary(
+        now: Date,
+        buckets: [String: AgentUsageDailyBucket],
+        calendar: Calendar
+    ) -> AgentUsageSpendSummary {
+        AgentUsageSpendSummary(
+            today: costMetric(range: .today, now: now, buckets: buckets, calendar: calendar),
+            sevenDays: costMetric(range: .sevenDays, now: now, buckets: buckets, calendar: calendar),
+            thirtyDays: costMetric(range: .thirtyDays, now: now, buckets: buckets, calendar: calendar),
+            dailyPoints: dailySpendPoints(now: now, buckets: buckets, calendar: calendar)
+        )
+    }
+
+    private nonisolated static func costMetric(
+        range: AgentUsageRange,
+        now: Date,
+        buckets: [String: AgentUsageDailyBucket],
+        calendar: Calendar
+    ) -> AgentUsageCostMetric {
+        let totals = tokenTotals(
+            for: range.dayCount,
+            now: now,
+            buckets: buckets,
+            calendar: calendar
+        )
+        return AgentUsageCostMetric(
+            range: range,
+            tokenTotals: totals,
+            estimatedUSD: AgentUsageCostEstimator.estimateUSD(for: totals)
+        )
+    }
+
+    private nonisolated static func dailySpendPoints(
+        now: Date,
+        buckets: [String: AgentUsageDailyBucket],
+        calendar: Calendar
+    ) -> [AgentUsageDailySpendPoint] {
+        let today = calendar.startOfDay(for: now)
+
+        return (0..<spendDayCount).reversed().compactMap { offset in
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
+                return nil
+            }
+            let key = AgentUsageStore.dayKey(for: date, calendar: calendar)
+            let totals = buckets[key]?.tokenTotals ?? AgentUsageTokenTotals()
+            return AgentUsageDailySpendPoint(
+                date: date,
+                tokenTotals: totals,
+                estimatedUSD: AgentUsageCostEstimator.estimateUSD(for: totals)
+            )
+        }
+    }
+
+    private nonisolated static func tokenTotals(
+        for dayCount: Int,
+        now: Date,
+        buckets: [String: AgentUsageDailyBucket],
+        calendar: Calendar
+    ) -> AgentUsageTokenTotals {
+        let today = calendar.startOfDay(for: now)
+        var totals = AgentUsageTokenTotals()
+
+        for offset in 0..<dayCount {
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
+                continue
+            }
+            let key = AgentUsageStore.dayKey(for: date, calendar: calendar)
+            totals.add(buckets[key]?.tokenTotals ?? AgentUsageTokenTotals())
+        }
+
+        return totals
     }
 }
 
@@ -433,12 +563,17 @@ actor AgentUsageStore {
                 total: max(1, sessionCount)
             ),
             topTools: rankItems(counts: toolCounts, total: max(1, toolUseCount)),
-            heatmapDays: AgentUsageDashboardSnapshot.annualHeatmapDays(
+            heatmapDays: AgentUsageDashboardSnapshot.recentHeatmapDays(
                 now: now,
                 buckets: document.buckets,
                 calendar: calendar
             ),
             trendPoints: AgentUsageDashboardSnapshot.trendPoints(
+                now: now,
+                buckets: document.buckets,
+                calendar: calendar
+            ),
+            spendSummary: AgentUsageDashboardSnapshot.spendSummary(
                 now: now,
                 buckets: document.buckets,
                 calendar: calendar
@@ -465,7 +600,7 @@ actor AgentUsageStore {
                 }
                 return lhs.count > rhs.count
             }
-            .prefix(8)
+            .prefix(5)
             .map { $0 }
     }
 
