@@ -901,7 +901,8 @@ struct InstanceRow: View {
             MascotView(
                 kind: settings.mascotKind(for: session.mascotClient),
                 status: MascotStatus(session: session),
-                size: usesSingleLineCompactLayout ? 16 : 18
+                size: usesSingleLineCompactLayout ? 16 : 18,
+                animationTime: 0
             )
             .padding(6)
 

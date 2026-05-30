@@ -512,13 +512,13 @@ struct MascotView: View {
         // Higher interval = lower FPS for better battery/thermal performance
         let baseInterval = switch mode {
         case .idle:
-            0.10  // 10 FPS for idle (slow animation, maximum battery savings)
+            0.50  // 2 FPS for idle drift; lists and idle-visible states prefer static frames.
         case .working:
-            0.033  // ~30 FPS for working state (smooth but efficient)
+            0.16  // ~6 FPS keeps activity legible without a constant render loop.
         case .warning:
-            0.04   // 25 FPS for warning (noticeable but not excessive)
+            0.20  // 5 FPS keeps attention visible without a constant render loop.
         case .dragging:
-            0.025  // 40 FPS for dragging (needs responsiveness)
+            0.033  // ~30 FPS for direct manipulation responsiveness.
         }
 
         switch energyGovernor.policy.animationLevel {
@@ -532,7 +532,7 @@ struct MascotView: View {
     }
 
     private func animatedCanvas(interval: TimeInterval, mode: MascotRenderMode) -> some View {
-        let effectiveInterval = adaptiveInterval(for: mode)
+        let effectiveInterval = interval
         return TimelineView(.periodic(from: .now, by: effectiveInterval)) { context in
             canvasFrame(time: context.date.timeIntervalSinceReferenceDate, mode: mode)
         }
@@ -2184,31 +2184,8 @@ private struct IdleProtectionMascotOverlay: View {
     let size: CGFloat
     var time: TimeInterval?
 
-    @ObservedObject private var energyGovernor = EnergyGovernor.shared
-
-    private static let updateInterval: TimeInterval = 0.12
-
     var body: some View {
-        if let time {
-            overlayBody(time: time)
-        } else if energyGovernor.policy.animationLevel == .staticFrames {
-            overlayBody(time: 0)
-        } else {
-            TimelineView(.periodic(from: .now, by: effectiveUpdateInterval)) { context in
-                overlayBody(time: context.date.timeIntervalSinceReferenceDate)
-            }
-        }
-    }
-
-    private var effectiveUpdateInterval: TimeInterval {
-        switch energyGovernor.policy.animationLevel {
-        case .full:
-            Self.updateInterval
-        case .reduced:
-            Self.updateInterval * 2.5
-        case .staticFrames:
-            Self.updateInterval
-        }
+        overlayBody(time: time ?? 0)
     }
 
     private func overlayBody(time: TimeInterval) -> some View {

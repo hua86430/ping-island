@@ -1,7 +1,73 @@
+import Combine
 import XCTest
 @testable import Ping_Island
 
 final class SessionStoreFileUpdateTests: XCTestCase {
+    func testNoOpEventDoesNotRepublishUnchangedSessions() async throws {
+        let store = SessionStore.shared
+        let sessionId = "publish-dedupe-\(UUID().uuidString)"
+        for session in await store.allSessions() {
+            await store.process(.sessionArchived(sessionId: session.sessionId))
+        }
+
+        var cancellables = Set<AnyCancellable>()
+        var initialEmissionCount = 0
+        var noOpEmissionCount = 0
+        var isObservingNoOpEvent = false
+        let firstEmission = expectation(description: "Initial session publication")
+        let unexpectedDuplicate = expectation(description: "Unexpected duplicate session publication")
+        unexpectedDuplicate.isInverted = true
+
+        store.sessionsPublisher
+            .sink { sessions in
+                guard sessions.contains(where: { $0.sessionId == sessionId }) else { return }
+                if isObservingNoOpEvent {
+                    noOpEmissionCount += 1
+                    unexpectedDuplicate.fulfill()
+                    return
+                }
+
+                initialEmissionCount += 1
+                if initialEmissionCount == 1 {
+                    firstEmission.fulfill()
+                }
+            }
+            .store(in: &cancellables)
+
+        await store.process(.hookReceived(
+            HookEvent(
+                sessionId: sessionId,
+                cwd: "/tmp/project",
+                event: "UserPromptSubmit",
+                status: "processing",
+                provider: .claude,
+                clientInfo: SessionClientInfo(kind: .claudeCode, name: "Claude Code"),
+                pid: nil,
+                tty: nil,
+                tool: nil,
+                toolInput: nil,
+                toolUseId: nil,
+                notificationType: nil,
+                message: "Start work"
+            )
+        ))
+
+        await fulfillment(of: [firstEmission], timeout: 1)
+        try await Task.sleep(nanoseconds: 350_000_000)
+        isObservingNoOpEvent = true
+
+        await store.process(.agentFileUpdated(
+            sessionId: sessionId,
+            taskToolId: "unused-task",
+            tools: []
+        ))
+
+        await fulfillment(of: [unexpectedDuplicate], timeout: 0.2)
+        XCTAssertEqual(noOpEmissionCount, 0)
+
+        await store.process(.sessionArchived(sessionId: sessionId))
+    }
+
     func testHookWorkspaceRefreshUpdatesDisplayedProjectName() async throws {
         let store = SessionStore.shared
         let sessionId = "cursor-workspace-refresh-\(UUID().uuidString)"

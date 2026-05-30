@@ -911,7 +911,8 @@ private struct HoverProviderGlyph: View {
             MascotView(
                 kind: settings.mascotKind(for: session.mascotClient),
                 status: MascotStatus(session: session),
-                size: 18
+                size: 18,
+                animationTime: 0
             )
             .frame(width: HoverSessionLayout.glyphSize, height: HoverSessionLayout.glyphSize)
             .background(attentionTone == nil ? Color.white.opacity(0.04) : Color.clear)

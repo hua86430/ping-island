@@ -43,6 +43,24 @@ final class EnergyGovernorTests: XCTestCase {
         XCTAssertEqual(policy.animationLevel, .staticFrames)
     }
 
+    func testVisibleIdleDropsMouseMoveMonitoring() {
+        let inputs = EnergyGovernorInputs(
+            hasActiveSession: false,
+            hasAttentionSession: false,
+            hasVisibleSession: true,
+            isSystemSuspended: false,
+            isWakeGraceActive: false,
+            isLowPowerModeEnabled: false
+        )
+
+        let mode = EnergyGovernor.resolvedMode(for: inputs)
+        let policy = EnergyPolicy.policy(for: mode)
+
+        XCTAssertEqual(mode, .idleVisible)
+        XCTAssertEqual(policy.eventMonitoringLevel, .interactionOnly)
+        XCTAssertEqual(policy.animationLevel, .staticFrames)
+    }
+
     func testSuspendedModePausesBackgroundPolling() {
         let inputs = EnergyGovernorInputs(
             hasActiveSession: true,

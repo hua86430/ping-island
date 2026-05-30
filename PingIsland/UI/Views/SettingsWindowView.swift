@@ -110,6 +110,10 @@ struct ClosedNotchUsageAvailability: Equatable {
     var hasCodexSevenDay = false
 
     static func current() -> ClosedNotchUsageAvailability {
+        guard AppSettings.showUsage else {
+            return ClosedNotchUsageAvailability()
+        }
+
         let cachedClaudeSnapshot = UsageSnapshotCacheStore.loadClaude()
         let cachedCodexSnapshot = UsageSnapshotCacheStore.loadCodex()
         let claudeSnapshot = if cachedClaudeSnapshot?.sevenDay == nil {

@@ -285,6 +285,7 @@ class SessionMonitor: ObservableObject {
                     guard let self else { return }
                     self.refreshVisibleSessions()
                     if self.shouldRefreshUsage,
+                       AppSettings.showUsage,
                        EnergyGovernor.shared.policy.usageRefreshInterval != nil {
                         self.refreshUsageState()
                     }
@@ -299,6 +300,12 @@ class SessionMonitor: ObservableObject {
     }
 
     func refreshUsageState() {
+        guard AppSettings.showUsage else {
+            usageRefreshTask?.cancel()
+            usageRefreshTask = nil
+            return
+        }
+
         usageRefreshTask?.cancel()
         usageRefreshTask = Task { [weak self] in
             guard let self else { return }
@@ -733,6 +740,7 @@ class SessionMonitor: ObservableObject {
     // MARK: - State Update
 
     private func updateFromSessions(_ sessions: [SessionState]) {
+        guard sessions != allSessions else { return }
         allSessions = sessions
         refreshVisibleSessions()
     }
@@ -741,8 +749,12 @@ class SessionMonitor: ObservableObject {
         let visibleSessions = filteredVisibleSessions(from: allSessions)
         let pendingSessions = visibleSessions.filter { $0.needsAttention }
         recordNewAttentionRequests(in: pendingSessions)
-        instances = visibleSessions
-        pendingInstances = pendingSessions
+        if visibleSessions != instances {
+            instances = visibleSessions
+        }
+        if pendingSessions != pendingInstances {
+            pendingInstances = pendingSessions
+        }
     }
 
     private func recordNewAttentionRequests(in pendingSessions: [SessionState]) {

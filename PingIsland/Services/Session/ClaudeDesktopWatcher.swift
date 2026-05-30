@@ -14,9 +14,17 @@ private let logger = Logger(subsystem: "com.wudanwu.pingisland", category: "Clau
 
 /// Sessions idle for longer than this threshold are skipped on startup.
 private let activeWindowSeconds: TimeInterval = 4 * 60 * 60  // 4 hours
+private let discoveryActiveInterval: Duration = .seconds(2)
+private let discoveryIdleInterval: Duration = .seconds(15)
+private let discoveryMissingRootInterval: Duration = .seconds(60)
 
 actor ClaudeDesktopWatcher {
     static let shared = ClaudeDesktopWatcher()
+
+    enum DiscoveryScanResult: Equatable {
+        case rootMissing
+        case scanned(registeredNewSession: Bool)
+    }
 
     private var discoveryTask: Task<Void, Never>?
     private var sessionTasks: [String: Task<Void, Never>] = [:]
@@ -51,25 +59,41 @@ actor ClaudeDesktopWatcher {
 
     private func runDiscoveryLoop() async {
         while !Task.isCancelled {
-            await scanForNewSessions()
+            let result = await scanForNewSessions()
             do {
-                try await Task.sleep(for: .seconds(2))
+                try await Task.sleep(for: Self.discoveryInterval(for: result))
             } catch {
                 break
             }
         }
     }
 
-    private func scanForNewSessions() async {
+    nonisolated static func discoveryInterval(for result: DiscoveryScanResult) -> Duration {
+        switch result {
+        case .rootMissing:
+            return discoveryMissingRootInterval
+        case .scanned(registeredNewSession: true):
+            return discoveryActiveInterval
+        case .scanned(registeredNewSession: false):
+            return discoveryIdleInterval
+        }
+    }
+
+    private func scanForNewSessions() async -> DiscoveryScanResult {
         let sessionsRoot = Self.sessionsRootURL()
-        guard FileManager.default.fileExists(atPath: sessionsRoot.path) else { return }
+        guard FileManager.default.fileExists(atPath: sessionsRoot.path) else {
+            return .rootMissing
+        }
 
         guard let orgDirs = try? FileManager.default.contentsOfDirectory(
             at: sessionsRoot,
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
-        ) else { return }
+        ) else {
+            return .scanned(registeredNewSession: false)
+        }
 
+        var registeredNewSession = false
         for orgDir in orgDirs where orgDir.hasDirectoryPath {
             guard let userDirs = try? FileManager.default.contentsOfDirectory(
                 at: orgDir,
@@ -78,18 +102,22 @@ actor ClaudeDesktopWatcher {
             ) else { continue }
 
             for userDir in userDirs where userDir.hasDirectoryPath {
-                await scanUserDirectory(userDir)
+                if await scanUserDirectory(userDir) {
+                    registeredNewSession = true
+                }
             }
         }
+        return .scanned(registeredNewSession: registeredNewSession)
     }
 
-    private func scanUserDirectory(_ userDir: URL) async {
+    private func scanUserDirectory(_ userDir: URL) async -> Bool {
         guard let entries = try? FileManager.default.contentsOfDirectory(
             at: userDir,
             includingPropertiesForKeys: nil,
             options: [.skipsHiddenFiles]
-        ) else { return }
+        ) else { return false }
 
+        var registeredNewSession = false
         for entry in entries {
             let name = entry.lastPathComponent
             guard name.hasPrefix("local_"), name.hasSuffix(".json") else { continue }
@@ -97,15 +125,18 @@ actor ClaudeDesktopWatcher {
 
             guard !knownLocalSessionIds.contains(localSessionId) else { continue }
 
-            await registerSession(metadataURL: entry, localSessionId: localSessionId)
+            if await registerSession(metadataURL: entry, localSessionId: localSessionId) {
+                registeredNewSession = true
+            }
         }
+        return registeredNewSession
     }
 
     // MARK: - Session Registration
 
-    private func registerSession(metadataURL: URL, localSessionId: String) async {
-        guard let metadata = Self.readMetadata(at: metadataURL) else { return }
-        guard !metadata.isArchived else { return }
+    private func registerSession(metadataURL: URL, localSessionId: String) async -> Bool {
+        guard let metadata = Self.readMetadata(at: metadataURL) else { return false }
+        guard !metadata.isArchived else { return false }
 
         // Skip sessions that have been idle longer than the active window.
         // This prevents loading dozens of historical sessions on startup.
@@ -115,12 +146,12 @@ actor ClaudeDesktopWatcher {
                 "Skipping stale Claude Desktop session \(metadata.cliSessionId.prefix(8), privacy: .public) idle=\(Int(idleSeconds))s"
             )
             knownLocalSessionIds.insert(localSessionId)
-            return
+            return false
         }
 
         let sessionDir = metadataURL.deletingPathExtension()
         let auditPath = sessionDir.appendingPathComponent("audit.jsonl").path
-        guard FileManager.default.fileExists(atPath: auditPath) else { return }
+        guard FileManager.default.fileExists(atPath: auditPath) else { return false }
 
         knownLocalSessionIds.insert(localSessionId)
         logger.info(
@@ -163,6 +194,7 @@ actor ClaudeDesktopWatcher {
             )
         }
         sessionTasks[localSessionId] = task
+        return true
     }
 
     // MARK: - Polling Loop

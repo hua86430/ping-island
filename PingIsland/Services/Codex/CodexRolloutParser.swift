@@ -15,6 +15,18 @@ actor CodexRolloutParser {
         let snapshot: CodexThreadSnapshot
     }
 
+    private let fractionalTimestampFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }()
+
+    private let wholeSecondTimestampFormatter: ISO8601DateFormatter = {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }()
+
     private var cache: [String: CachedSnapshot] = [:]
 
     func parseThread(
@@ -674,14 +686,11 @@ actor CodexRolloutParser {
     private func parseISO8601(_ value: String?) -> Date? {
         guard let value = value?.nonEmpty else { return nil }
 
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
+        if let date = fractionalTimestampFormatter.date(from: value) {
             return date
         }
 
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter.date(from: value)
+        return wholeSecondTimestampFormatter.date(from: value)
     }
 
     private func normalizedText(_ value: Any?) -> String? {

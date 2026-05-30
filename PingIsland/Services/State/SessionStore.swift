@@ -59,11 +59,15 @@ actor SessionStore {
     private var pendingQoderConversationPolls: [String: (id: UUID, task: Task<Void, Never>)] = [:]
     private var pendingOpenClawConversationPolls: [String: (id: UUID, task: Task<Void, Never>)] = [:]
     private var pendingCodeBuddyCLIQuestionPolls: [String: (id: UUID, task: Task<Void, Never>)] = [:]
+    private var lastCodexRolloutParseAt: [String: Date] = [:]
+    private var codexRolloutParsesInFlight: Set<String> = []
     private var codexSessionAliases: [String: String] = [:]
     private var ignoredCodexAuxiliaryHookSessionIds: Set<String> = []
 
     /// Sync debounce interval (100ms)
     private let syncDebounceNs: UInt64 = 100_000_000
+    private let codexRolloutParseFallbackInterval: TimeInterval = 2
+    private let codexRolloutParseWithAppServerInterval: TimeInterval = 30
     private let codexHookPlaceholderPruneDelayNs: UInt64 = 10_000_000_000
     private let codexAppServerPlaceholderPruneDelayNs: UInt64 = 60_000_000_000
     private let codexContinuationMergeWindow: TimeInterval = 10 * 60
@@ -98,6 +102,7 @@ actor SessionStore {
 
     /// Publisher for session state changes (nonisolated for Combine subscription from any context)
     private nonisolated(unsafe) let sessionsSubject = CurrentValueSubject<[SessionState], Never>([])
+    private var lastPublishedSessions: [SessionState] = []
 
     /// Public publisher for UI subscription
     nonisolated var sessionsPublisher: AnyPublisher<[SessionState], Never> {
@@ -3068,11 +3073,21 @@ actor SessionStore {
                 // or the thread hasn't been materialized there yet.
             }
 
-            guard let snapshot = await CodexRolloutParser.shared.parseThread(
+            guard await self?.reserveCodexRolloutParseIfNeeded(
+                sessionId: sessionId,
+                hasAppServerSnapshot: appServerSnapshot != nil
+            ) == true else {
+                return
+            }
+
+            let snapshot = await CodexRolloutParser.shared.parseThread(
                 threadId: sessionId,
                 fallbackCwd: cwd,
                 clientInfo: clientInfo
-            ) else {
+            )
+            await self?.finishCodexRolloutParse(sessionId: sessionId)
+
+            guard let snapshot else {
                 return
             }
 
@@ -3085,6 +3100,33 @@ actor SessionStore {
 
             await self?.syncCodexThreadSnapshot(snapshot, ingress: .hookBridge)
         }
+    }
+
+    private func reserveCodexRolloutParseIfNeeded(
+        sessionId: String,
+        hasAppServerSnapshot: Bool
+    ) -> Bool {
+        guard !codexRolloutParsesInFlight.contains(sessionId) else {
+            return false
+        }
+
+        let now = Date()
+        let interval = hasAppServerSnapshot
+            ? codexRolloutParseWithAppServerInterval
+            : codexRolloutParseFallbackInterval
+
+        if let lastParseAt = lastCodexRolloutParseAt[sessionId],
+           now.timeIntervalSince(lastParseAt) < interval {
+            return false
+        }
+
+        codexRolloutParsesInFlight.insert(sessionId)
+        return true
+    }
+
+    private func finishCodexRolloutParse(sessionId: String) {
+        codexRolloutParsesInFlight.remove(sessionId)
+        lastCodexRolloutParseAt[sessionId] = Date()
     }
 
     // MARK: - State Publishing
@@ -3111,6 +3153,8 @@ actor SessionStore {
             scheduleAssociationSave()
         }
 
+        guard sortedSessions != lastPublishedSessions else { return }
+        lastPublishedSessions = sortedSessions
         sessionsSubject.send(sortedSessions)
     }
 
@@ -4071,6 +4115,8 @@ actor SessionStore {
     }
 
     private func clearCodexSessionAliases(for sessionId: String) {
+        lastCodexRolloutParseAt.removeValue(forKey: sessionId)
+        codexRolloutParsesInFlight.remove(sessionId)
         codexSessionAliases.removeValue(forKey: sessionId)
         codexSessionAliases = codexSessionAliases.filter { $0.value != sessionId }
     }
