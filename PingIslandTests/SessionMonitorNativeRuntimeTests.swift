@@ -10,9 +10,14 @@ final class SessionMonitorNativeRuntimeTests: XCTestCase {
         var answeredSessionIDs: [(String, [String: [String]])] = []
         var sentInputs: [(SessionProvider, String, String)] = []
         var continuedSessions: [(SessionProvider, String, String?, String)] = []
+        var shouldFailApprovals = false
 
         func markManaged(_ sessionID: String) {
             managedSessionIDs.insert(sessionID)
+        }
+
+        func failApprovals() {
+            shouldFailApprovals = true
         }
 
         func approvals() -> [(String, Bool)] {
@@ -64,6 +69,9 @@ final class SessionMonitorNativeRuntimeTests: XCTestCase {
         }
 
         func approveSession(provider: SessionProvider, sessionID: String, forSession: Bool) async throws {
+            if shouldFailApprovals {
+                throw NSError(domain: "StubRuntimeCoordinator", code: 1)
+            }
             approvedSessionIDs.append((sessionID, forSession))
         }
 
@@ -165,6 +173,97 @@ final class SessionMonitorNativeRuntimeTests: XCTestCase {
         XCTAssertEqual(approved.count, 1)
         XCTAssertEqual(approved.first?.0, sessionID)
         XCTAssertEqual(approved.first?.1, true)
+
+        await SessionStore.shared.process(.sessionArchived(sessionId: sessionID))
+    }
+
+    func testApprovePermissionClearsNativeApprovalEvenWhenRuntimeFails() async {
+        let runtimeCoordinator = StubRuntimeCoordinator()
+        let monitor = SessionMonitor(runtimeCoordinator: runtimeCoordinator)
+        let sessionID = "native-approval-failure-\(UUID().uuidString)"
+
+        await SessionStore.shared.process(.runtimeSessionStarted(
+            SessionRuntimeHandle(
+                sessionID: sessionID,
+                provider: .claude,
+                cwd: "/tmp/native-approval-failure",
+                createdAt: Date(),
+                resumeToken: nil,
+                runtimeIdentifier: "stub",
+                sessionFilePath: nil
+            )
+        ))
+        await runtimeCoordinator.markManaged(sessionID)
+        await runtimeCoordinator.failApprovals()
+        await SessionStore.shared.process(.hookReceived(
+            HookEvent(
+                sessionId: sessionID,
+                cwd: "/tmp/native-approval-failure",
+                event: "PermissionRequest",
+                status: "waiting_for_approval",
+                provider: .claude,
+                clientInfo: SessionClientInfo(kind: .claudeCode, name: "Claude Code"),
+                pid: nil,
+                tty: nil,
+                tool: "Bash",
+                toolInput: ["command": AnyCodable("pwd")],
+                toolUseId: "tool-native-approve-failure",
+                notificationType: nil,
+                message: nil,
+                ingress: .nativeRuntime
+            )
+        ))
+
+        monitor.approvePermission(sessionId: sessionID)
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        let session = await SessionStore.shared.session(for: sessionID)
+        XCTAssertNil(session?.intervention)
+        XCTAssertFalse(session?.needsApprovalResponse ?? true)
+        XCTAssertEqual(session?.phase, .processing)
+        let approved = await runtimeCoordinator.approvals()
+        XCTAssertTrue(approved.isEmpty)
+
+        await SessionStore.shared.process(.sessionArchived(sessionId: sessionID))
+    }
+
+    func testDenyPermissionClearsCodexAppServerApprovalWithoutPendingRequest() async {
+        let runtimeCoordinator = StubRuntimeCoordinator()
+        let monitor = SessionMonitor(runtimeCoordinator: runtimeCoordinator)
+        let sessionID = "codex-appserver-deny-\(UUID().uuidString)"
+        let intervention = SessionIntervention(
+            id: "codex-appserver-tool",
+            kind: .approval,
+            title: "Command Approval Needed",
+            message: "Run risky command?",
+            options: [],
+            questions: [],
+            supportsSessionScope: true,
+            metadata: ["toolUseId": "codex-appserver-tool"]
+        )
+
+        await SessionStore.shared.upsertCodexSession(
+            sessionId: sessionID,
+            name: "Codex",
+            preview: "Run risky command?",
+            cwd: "/tmp/codex-appserver-deny",
+            phase: .waitingForApproval(PermissionContext(
+                toolUseId: "codex-appserver-tool",
+                toolName: "Bash",
+                toolInput: nil,
+                receivedAt: Date()
+            )),
+            intervention: intervention,
+            clientInfo: SessionClientInfo.codexApp(threadId: sessionID)
+        )
+
+        monitor.denyPermission(sessionId: sessionID, reason: "nope")
+        try? await Task.sleep(nanoseconds: 100_000_000)
+
+        let session = await SessionStore.shared.session(for: sessionID)
+        XCTAssertNil(session?.intervention)
+        XCTAssertFalse(session?.needsApprovalResponse ?? true)
+        XCTAssertEqual(session?.phase, .processing)
 
         await SessionStore.shared.process(.sessionArchived(sessionId: sessionID))
     }

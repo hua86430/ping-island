@@ -371,6 +371,12 @@ class SessionMonitor: ObservableObject {
             guard let session = await SessionStore.shared.session(for: sessionId) else {
                 return
             }
+            let permission = Self.approvalToolUseId(for: session)
+            await clearApprovalNotification(
+                for: session,
+                toolUseId: permission,
+                decision: .approve
+            )
 
             if session.ingress == .nativeRuntime {
                 try? await runtimeCoordinator.approveSession(
@@ -398,7 +404,7 @@ class SessionMonitor: ObservableObject {
                 return
             }
 
-            guard let permission = session.activePermission else { return }
+            guard let permission else { return }
 
             if forSession, session.scopedApprovalAction == .autoApprove {
                 await SessionStore.shared.process(
@@ -406,37 +412,31 @@ class SessionMonitor: ObservableObject {
                 )
                 if session.ingress == .remoteBridge {
                     RemoteConnectorManager.shared.respondToPermission(
-                        toolUseId: permission.toolUseId,
+                        toolUseId: permission,
                         decision: "approveForSession"
                     )
                 } else {
                     HookSocketServer.shared.respondToPermission(
-                        toolUseId: permission.toolUseId,
+                        toolUseId: permission,
                         decision: "approveForSession"
                     )
                 }
-                await SessionStore.shared.process(
-                    .permissionApproved(sessionId: sessionId, toolUseId: permission.toolUseId)
-                )
                 await TelemetryService.shared.recordAttentionResolved(session, resolution: "approve_for_session")
                 return
             }
 
             if session.ingress == .remoteBridge {
                 RemoteConnectorManager.shared.respondToPermission(
-                    toolUseId: permission.toolUseId,
+                    toolUseId: permission,
                     decision: "allow"
                 )
             } else {
                 HookSocketServer.shared.respondToPermission(
-                    toolUseId: permission.toolUseId,
+                    toolUseId: permission,
                     decision: "allow"
                 )
             }
 
-            await SessionStore.shared.process(
-                .permissionApproved(sessionId: sessionId, toolUseId: permission.toolUseId)
-            )
             await TelemetryService.shared.recordAttentionResolved(session, resolution: "approve")
         }
     }
@@ -446,6 +446,12 @@ class SessionMonitor: ObservableObject {
             guard let session = await SessionStore.shared.session(for: sessionId) else {
                 return
             }
+            let permission = Self.approvalToolUseId(for: session)
+            await clearApprovalNotification(
+                for: session,
+                toolUseId: permission,
+                decision: .deny(reason: reason)
+            )
 
             if session.ingress == .nativeRuntime {
                 try? await runtimeCoordinator.denySession(
@@ -467,26 +473,78 @@ class SessionMonitor: ObservableObject {
                 return
             }
 
-            guard let permission = session.activePermission else { return }
+            guard let permission else { return }
 
             if session.ingress == .remoteBridge {
                 RemoteConnectorManager.shared.respondToPermission(
-                    toolUseId: permission.toolUseId,
+                    toolUseId: permission,
                     decision: "deny",
                     reason: reason
                 )
             } else {
                 HookSocketServer.shared.respondToPermission(
-                    toolUseId: permission.toolUseId,
+                    toolUseId: permission,
                     decision: "deny",
                     reason: reason
                 )
             }
 
-            await SessionStore.shared.process(
-                .permissionDenied(sessionId: sessionId, toolUseId: permission.toolUseId, reason: reason)
-            )
             await TelemetryService.shared.recordAttentionResolved(session, resolution: "deny")
+        }
+    }
+
+    private enum ApprovalDecision {
+        case approve
+        case deny(reason: String?)
+    }
+
+    private nonisolated static func approvalToolUseId(for session: SessionState) -> String? {
+        if let toolUseId = session.activePermission?.toolUseId,
+           !toolUseId.isEmpty {
+            return toolUseId
+        }
+
+        guard let intervention = session.intervention,
+              intervention.kind == .approval else {
+            return nil
+        }
+
+        return [
+            intervention.metadata["originalToolUseId"],
+            intervention.metadata["toolUseId"],
+            intervention.metadata["tool_use_id"],
+            intervention.id
+        ].compactMap { candidate -> String? in
+            guard let candidate else { return nil }
+            let trimmed = candidate.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }.first
+    }
+
+    private func clearApprovalNotification(
+        for session: SessionState,
+        toolUseId: String?,
+        decision: ApprovalDecision
+    ) async {
+        guard session.needsApprovalResponse else { return }
+
+        guard let toolUseId else {
+            await SessionStore.shared.resolveCodexIntervention(
+                sessionId: session.sessionId,
+                nextPhase: .processing
+            )
+            return
+        }
+
+        switch decision {
+        case .approve:
+            await SessionStore.shared.process(
+                .permissionApproved(sessionId: session.sessionId, toolUseId: toolUseId)
+            )
+        case .deny(let reason):
+            await SessionStore.shared.process(
+                .permissionDenied(sessionId: session.sessionId, toolUseId: toolUseId, reason: reason)
+            )
         }
     }
 
