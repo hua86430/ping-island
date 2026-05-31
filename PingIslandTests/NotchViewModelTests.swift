@@ -160,6 +160,60 @@ final class NotchViewModelTests: XCTestCase {
         }
     }
 
+    func testConfiguredNotchModuleWidthControlsExternalDisplayClosedWidth() async {
+        await MainActor.run {
+            let viewModel = NotchViewModel(
+                deviceNotchRect: CGRect(x: 0, y: 0, width: 224, height: 38),
+                screenRect: CGRect(x: 0, y: 0, width: 2560, height: 1440),
+                windowHeight: 320,
+                hasPhysicalNotch: false,
+                enableEventMonitoring: false,
+                observeSystemEnvironment: false,
+                fullscreenActivityProvider: { _ in false },
+                notchModuleWidthProvider: { 212 }
+            )
+
+            XCTAssertEqual(viewModel.closedWidth, 212)
+            XCTAssertEqual(viewModel.closedSize, CGSize(width: 212, height: 32))
+        }
+    }
+
+    func testMinimumNotchModuleWidthSupportsIconOnlyExternalDisplayClosedWidth() async {
+        await MainActor.run {
+            let viewModel = NotchViewModel(
+                deviceNotchRect: CGRect(x: 0, y: 0, width: 224, height: 38),
+                screenRect: CGRect(x: 0, y: 0, width: 2560, height: 1440),
+                windowHeight: 320,
+                hasPhysicalNotch: false,
+                enableEventMonitoring: false,
+                observeSystemEnvironment: false,
+                fullscreenActivityProvider: { _ in false },
+                notchModuleWidthProvider: { AppSettingsStore.minimumNotchModuleWidth }
+            )
+
+            XCTAssertEqual(viewModel.closedWidth, AppSettingsStore.minimumNotchModuleWidth)
+            XCTAssertGreaterThanOrEqual(viewModel.closedSize.width, 64)
+        }
+    }
+
+    func testConfiguredNotchModuleWidthDoesNotClipPhysicalNotchAllowance() async {
+        await MainActor.run {
+            let viewModel = NotchViewModel(
+                deviceNotchRect: CGRect(x: 0, y: 0, width: 220, height: 38),
+                screenRect: CGRect(x: 0, y: 0, width: 1512, height: 982),
+                windowHeight: 320,
+                hasPhysicalNotch: true,
+                enableEventMonitoring: false,
+                observeSystemEnvironment: false,
+                fullscreenActivityProvider: { _ in false },
+                notchModuleWidthProvider: { 180 }
+            )
+
+            XCTAssertEqual(viewModel.closedWidth, 306)
+            XCTAssertEqual(viewModel.closedSize, CGSize(width: 306, height: 38))
+        }
+    }
+
     func testScreenGeometryUpdateRefreshesClosedSizeAndPanelLimits() async {
         await MainActor.run {
             let viewModel = NotchViewModel(
@@ -419,7 +473,7 @@ final class NotchViewModelTests: XCTestCase {
         )
     }
 
-    func testDetachmentTriggerScreenRectUsesFixedPhysicalNotchRegion() async {
+    func testDetachmentTriggerScreenRectTracksClosedNotchFootprint() async {
         await MainActor.run {
             let viewModel = NotchViewModel(
                 deviceNotchRect: CGRect(x: 0, y: 0, width: 220, height: 38),
@@ -431,7 +485,7 @@ final class NotchViewModelTests: XCTestCase {
                 fullscreenActivityProvider: { _ in false }
             )
 
-            XCTAssertEqual(viewModel.detachmentTriggerScreenRect, viewModel.geometry.notchScreenRect)
+            XCTAssertEqual(viewModel.detachmentTriggerScreenRect, viewModel.closedScreenRect)
         }
     }
 

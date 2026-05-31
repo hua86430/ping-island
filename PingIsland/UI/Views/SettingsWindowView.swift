@@ -2801,6 +2801,15 @@ private struct SettingsPanelContentView: View {
                     SettingsLineDivider()
                     NotchDisplayModeSelector(mode: $settings.notchDisplayMode)
                     SettingsLineDivider()
+                    SettingsSliderLine(
+                        title: "刘海模块宽度",
+                        subtitle: "调窄外接显示器上的闭合态刘海宽度；较窄时会降级为单图标显示，内置刘海屏会保留系统刘海所需的最小宽度。",
+                        value: $settings.notchModuleWidth,
+                        range: AppSettings.notchModuleWidthRange,
+                        step: 4,
+                        format: { "\($0.formatted(.number.precision(.fractionLength(0)))) pt" }
+                    )
+                    SettingsLineDivider()
                     SettingsInfoLine(
                         title: "右侧展示内容",
                         subtitle: "默认显示会话数量；检测到 Claude Code 或 Codex 的 7d 用量后，可改为展示其中一个客户端的 Token 剩余额度。"

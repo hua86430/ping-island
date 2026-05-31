@@ -259,7 +259,8 @@ final class IslandPresentationCoordinator {
             deviceNotchRect: geometry.deviceNotchRect,
             screenRect: geometry.screenRect,
             windowHeight: geometry.windowHeight,
-            hasPhysicalNotch: geometry.hasPhysicalNotch
+            hasPhysicalNotch: geometry.hasPhysicalNotch,
+            notchModuleWidthProvider: { AppSettings.notchModuleWidth }
         )
     }
 

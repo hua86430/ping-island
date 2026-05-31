@@ -240,6 +240,21 @@ final class AppSettingsPersistenceTests: XCTestCase {
         )
     }
 
+    func testNotchModuleWidthDefaultsClampsAndPersists() {
+        let defaults = makeDefaults()
+        let store = makeStore(defaults: defaults)
+
+        XCTAssertEqual(store.notchModuleWidth, AppSettingsStore.defaultNotchModuleWidth)
+
+        store.notchModuleWidth = AppSettingsStore.minimumNotchModuleWidth - 20
+        XCTAssertEqual(store.notchModuleWidth, AppSettingsStore.minimumNotchModuleWidth)
+
+        store.notchModuleWidth = 332
+        let reloadedStore = makeStore(defaults: defaults)
+        XCTAssertEqual(reloadedStore.notchModuleWidth, 332)
+        XCTAssertEqual(defaults.double(forKey: AppSettingsDefaultKeys.notchModuleWidth), 332)
+    }
+
     func testSurfaceModePersists() {
         let defaults = makeDefaults()
         let store = makeStore(defaults: defaults)

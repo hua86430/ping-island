@@ -73,6 +73,9 @@
 "设置展示模式和刘海示意图里使用的默认宠物。当前只影响设置内示意图。" = "Choose the mascot used in the presentation-mode and notch previews. This currently only affects Settings previews.";
 "刘海显示模式" = "Notch display mode";
 "直接预览刘海闭合态效果。简约模式只显示宠物和数量，详细模式会额外显示中间过程信息。" = "Preview the closed-notch appearance directly. Compact mode only shows the mascot and count, while detailed mode also shows in-progress context.";
+"刘海模块宽度" = "Notch module width";
+"调窄外接显示器上的闭合态刘海宽度；内置刘海屏会保留系统刘海所需的最小宽度。" = "Narrow the closed-notch width on external displays. Built-in notched displays keep the minimum width needed for the system notch.";
+"调窄外接显示器上的闭合态刘海宽度；较窄时会降级为单图标显示，内置刘海屏会保留系统刘海所需的最小宽度。" = "Narrow the closed-notch width on external displays. Very narrow widths fall back to a single icon, while built-in notched displays keep the minimum width needed for the system notch.";
 "右侧展示内容" = "Right-side content";
 "默认显示会话数量；检测到 Claude Code 或 Codex 的 7d 用量后，可改为展示其中一个客户端的 Token 剩余额度。" = "Show the session count by default. When Claude Code or Codex 7d usage is detected, you can show one client's remaining token quota instead.";
 "会话数量" = "Session count";

@@ -18,6 +18,7 @@ private let cornerRadiusInsets = (
 /// Keeps the compact center message slightly narrower than the full center slot
 /// so the closed notch matches the tighter visual balance used elsewhere.
 private let compactCenterContentInset: CGFloat = 14
+private let minimumClosedNotchFullContentWidth: CGFloat = 96
 
 struct OpenedPanelContentHeightPreferenceKey: PreferenceKey {
     static var defaultValue: CGFloat = 0
@@ -637,6 +638,9 @@ struct NotchView: View {
                     // Preserve the native-notch footprint without letting the
                     // empty closed state expand across the whole window.
                     .frame(width: closedInnerWidth, height: closedNotchSize.height)
+            } else if usesClosedIconOnlyLayout {
+                closedIconOnlyContent
+                    .frame(width: closedInnerWidth, height: closedNotchSize.height)
             } else {
                 HStack(spacing: 0) {
                     // Left side - pet always visible while closed.
@@ -680,6 +684,35 @@ struct NotchView: View {
             }
         }
         .frame(height: closedNotchSize.height)
+    }
+
+    private var usesClosedIconOnlyLayout: Bool {
+        viewModel.status != .opened
+            && closedNotchSize.width < minimumClosedNotchFullContentWidth
+    }
+
+    @ViewBuilder
+    private var closedIconOnlyContent: some View {
+        ZStack {
+            if hasManualAttentionIndicator {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: min(16, iconOnlySize), weight: .semibold))
+                    .foregroundStyle(closedIndicatorTone.emphasisColor)
+                    .accessibilityLabel("需要处理")
+            } else {
+                MascotView(
+                    kind: closedMascotKind,
+                    status: closedMascotStatus,
+                    size: iconOnlySize
+                )
+                .matchedGeometryEffect(id: "pet", in: activityNamespace, isSource: showsClosedLeadingIcon)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+
+    private var iconOnlySize: CGFloat {
+        max(12, min(petIconSize, closedInnerWidth))
     }
 
     private var sideWidth: CGFloat {

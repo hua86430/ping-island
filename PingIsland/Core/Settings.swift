@@ -11,6 +11,7 @@ import Foundation
 
 enum AppSettingsDefaultKeys {
     nonisolated static let surfaceMode = "surfaceMode"
+    nonisolated static let notchModuleWidth = "notchModuleWidth"
     nonisolated static let floatingPetAnchor = "floatingPetAnchor"
     nonisolated static let floatingPetSizeMode = "floatingPetSizeMode"
     nonisolated static let presentationModeOnboardingPending = "presentationModeOnboardingPending"
@@ -344,6 +345,9 @@ enum NotchPetStyle: String, CaseIterable, Identifiable {
 @MainActor
 final class AppSettingsStore: ObservableObject {
     static let shared = AppSettingsStore()
+    nonisolated static let defaultNotchModuleWidth: Double = 266
+    nonisolated static let minimumNotchModuleWidth: Double = 64
+    nonisolated static let maximumNotchModuleWidth: Double = 420
 
     private let defaults: UserDefaults
     private let bridgeRuntimeConfigWriter: (Bool) -> Void
@@ -389,6 +393,7 @@ final class AppSettingsStore: ObservableObject {
         static let usageValueMode = "usageValueMode"
         static let contentFontSize = "contentFontSize"
         static let maxPanelHeight = "maxPanelHeight"
+        static let notchModuleWidth = AppSettingsDefaultKeys.notchModuleWidth
         static let notchPetStyle = "notchPetStyle"
         static let notchDisplayMode = "notchDisplayMode"
         static let closedNotchTrailingContentMode = "closedNotchTrailingContentMode"
@@ -727,6 +732,19 @@ final class AppSettingsStore: ObservableObject {
             }
             guard !isBootstrapping else { return }
             defaults.set(maxPanelHeight, forKey: Keys.maxPanelHeight)
+        }
+    }
+
+    @Published var notchModuleWidth: Double {
+        didSet {
+            let clamped = Self.normalizedNotchModuleWidth(notchModuleWidth)
+            if notchModuleWidth != clamped {
+                notchModuleWidth = clamped
+                return
+            }
+            guard !isBootstrapping else { return }
+            defaults.set(notchModuleWidth, forKey: Keys.notchModuleWidth)
+            recordTelemetrySettingChange(key: Keys.notchModuleWidth, value: "\(Int(notchModuleWidth))")
         }
     }
 
@@ -1154,6 +1172,10 @@ final class AppSettingsStore: ObservableObject {
         return legacyOverrides
     }
 
+    nonisolated static func normalizedNotchModuleWidth(_ width: Double) -> Double {
+        min(max(width, minimumNotchModuleWidth), maximumNotchModuleWidth)
+    }
+
     private func applyIsland8BitStartSoundMigrationIfNeeded(for mode: SoundThemeMode) {
         guard mode == .island8Bit else { return }
         guard !containsPersistedValue(forKey: Keys.island8BitStartSoundMigrated) else { return }
@@ -1362,6 +1384,12 @@ final class AppSettingsStore: ObservableObject {
             exists: persistedKeys.contains(Keys.maxPanelHeight),
             default: 580
         ))
+        _notchModuleWidth = Published(initialValue: Self.normalizedNotchModuleWidth(Self.doubleValue(
+            from: defaults,
+            key: Keys.notchModuleWidth,
+            exists: persistedKeys.contains(Keys.notchModuleWidth),
+            default: Self.defaultNotchModuleWidth
+        )))
         _notchPetStyle = Published(initialValue: NotchPetStyle(rawValue: notchPetStyleRaw ?? "") ?? .cat)
         _notchDisplayMode = Published(initialValue: NotchDisplayMode(rawValue: notchDisplayModeRaw ?? "") ?? .compact)
         _closedNotchTrailingContentMode = Published(initialValue: ClosedNotchTrailingContentMode(
@@ -1489,6 +1517,8 @@ enum AppSettings {
     nonisolated static let defaultSettingsWindowSize = CGSize(width: 880, height: 520)
     nonisolated static let minimumSettingsWindowSize = CGSize(width: 820, height: 500)
     nonisolated static let maximumSettingsWindowSize = CGSize(width: 1440, height: 1100)
+    nonisolated static let notchModuleWidthRange =
+        AppSettingsStore.minimumNotchModuleWidth...AppSettingsStore.maximumNotchModuleWidth
 
     static var notificationSound: NotificationSound {
         get { shared.notificationSound }
@@ -1594,6 +1624,11 @@ enum AppSettings {
     static var maxPanelHeight: Double {
         get { shared.maxPanelHeight }
         set { shared.maxPanelHeight = newValue }
+    }
+
+    static var notchModuleWidth: Double {
+        get { shared.notchModuleWidth }
+        set { shared.notchModuleWidth = newValue }
     }
 
     static var notchPetStyle: NotchPetStyle {
