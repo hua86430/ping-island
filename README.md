@@ -8,7 +8,7 @@
   <a href="#lets-try-it">Try it</a> •
   <a href="#installation">Install</a> •
   <a href="#features">Features</a> •
-  <a href="#supported-tools">Supported Tools</a> •
+  <a href="#supported-clients">Supported Clients</a> •
   <a href="#build-from-source">Build</a> •
   <a href="#contributors">Contributors</a> •
   <a href="docs/privacy-policy.md">Privacy</a><br>
@@ -149,12 +149,23 @@ Ping Island focuses on the moments that actually interrupt coding flow, then kee
 - **Qwen capybara mascot** - Qwen Code now ships with a mint-scarf capybara mascot tuned for prompt, reply, and notification-heavy flows.
 - **Kimi keyboard-orb mascot** - Kimi CLI keeps its original blue keyboard-orb mascot so its hook sessions stay visually distinct in the README strip and app UI.
 
-<a id="supported-tools"></a>
-## Supported Tools
+<a id="supported-clients"></a>
+## Supported Clients
 
-<p align="center">
-  <img src="docs/images/ping-island-mascot-poster.png" width="960" alt="Ping Island supported tools poster">
-</p>
+| Client | Ingress | Focus / return path | Island capabilities |
+| --- | --- | --- | --- |
+| Claude Code | Claude-compatible hooks through `PingIslandBridge` | Terminal.app, iTerm2, Ghostty, tmux, and IDE terminals | Tool approvals, AskUserQuestion replies, compaction alerts, completion popups, auto-approve |
+| Codex App + Codex CLI | Codex CLI hooks, live `codex app-server`, rollout parsing fallback | Codex app, terminal, tmux, and IDE terminals | Approval/input requests, live thread sync, usage snapshots, remote app-server forwarding |
+| Gemini CLI | Gemini CLI hooks in `~/.gemini/settings.json` | Compatible terminal hosts | Session lifecycle, tool activity, notifications, pre-compaction events |
+| Hermes Agent | Official plugin hooks in `~/.hermes/plugins/ping_island/` | Hermes CLI terminal host | User prompts, tool activity, assistant replies, session-end notifications |
+| Qwen Code | Official hooks in `~/.qwen/settings.json` | Compatible terminal hosts and remote SSH sessions | Permission prompts, notification popups, stop/session-end handling, remote hook forwarding |
+| Kimi CLI | Official `[[hooks]]` entries in `~/.kimi/config.toml` | Compatible terminal hosts | Tool activity, notifications, turn completion, session-end handling |
+| OpenClaw | Managed internal hooks plus local transcript refresh | OpenClaw terminal host | Fast hook status, transcript backfill, message/session state |
+| OpenCode | Generated plugin file under `~/.config/opencode/plugins/` | OpenCode app and terminal host | Plugin event forwarding into the shared Island UI |
+| Cursor | Claude-compatible hooks plus optional VS Code-compatible focus extension | Cursor project window and active terminal | IDE routing, terminal focus, Claude-family session tracking |
+| Qoder / Qoder CLI / QoderWork | Managed hook profiles in `~/.qoder/settings.json` and `~/.qoderwork/settings.json` | Qoder windows, terminal, and supported IDE extension paths | Separate IDE/CLI semantics, approvals where supported, notify-only handling for QoderWork |
+| CodeBuddy / WorkBuddy | Managed hook profiles plus optional VS Code-compatible focus extension | App windows, terminal, and supported IDE extension paths | Claude-family session tracking, client-aware jump-back, follow-up visibility |
+| GitHub Copilot | Copilot hook protocol | Compatible terminal hosts | Copilot CLI / agent hook event status |
 
 Ping Island also ships VS Code-compatible focus extensions for VS Code, Cursor, CodeBuddy, WorkBuddy, and Qoder. `QoderWork` is hook-only today and does not participate in the IDE extension path.
 
