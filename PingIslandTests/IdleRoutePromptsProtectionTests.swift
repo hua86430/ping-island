@@ -110,6 +110,11 @@ final class IdleRoutePromptsProtectionTests: XCTestCase {
         let suiteName = "PingIslandTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suiteName)!
         defaults.removePersistentDomain(forName: suiteName)
-        return AppSettingsStore(defaults: defaults, bridgeRuntimeConfigWriter: writer)
+        return AppSettingsStore(
+            defaults: defaults,
+            bridgeRuntimeConfigWriter: { snapshot in
+                writer(snapshot.routePromptsToTerminal)
+            }
+        )
     }
 }

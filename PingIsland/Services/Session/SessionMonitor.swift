@@ -207,6 +207,14 @@ class SessionMonitor: ObservableObject {
            let toolUseId = effectiveEvent.toolUseId,
            let session = await SessionStore.shared.session(for: effectiveEvent.sessionId) {
             if session.activePermission?.toolUseId == toolUseId {
+                if effectiveEvent.ingress == .remoteBridge {
+                    RemoteConnectorManager.shared.respondToPermission(
+                        toolUseId: toolUseId,
+                        decision: "cancel"
+                    )
+                } else {
+                    HookSocketServer.shared.cancelPendingPermission(toolUseId: toolUseId)
+                }
                 // Tool was approved externally (e.g. terminal) and completed.
                 // Resolve the pending Island-side intervention.
                 await SessionStore.shared.process(

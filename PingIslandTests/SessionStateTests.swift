@@ -314,7 +314,7 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(session.pendingToolInput, "command: swift test\ntimeout: 30")
     }
 
-    func testRoutePromptsToTerminalSuppressesInAppPromptControls() {
+    func testRoutePromptsToTerminalKeepsApprovalControlsWhenIslandCanRespond() {
         let session = SessionState(
             sessionId: "approval-session",
             cwd: "/tmp/project",
@@ -324,6 +324,40 @@ final class SessionStateTests: XCTestCase {
         )
 
         XCTAssertFalse(session.shouldSuppressInAppPromptControls(routePromptsToTerminal: false))
+        XCTAssertFalse(session.shouldSuppressInAppPromptControls(routePromptsToTerminal: true))
+    }
+
+    func testRoutePromptsToTerminalSuppressesApprovalControlsWithoutResponseTarget() {
+        let session = SessionState(
+            sessionId: "approval-session",
+            cwd: "/tmp/project",
+            phase: .waitingForApproval(
+                PermissionContext(toolUseId: "", toolName: "Bash", toolInput: nil, receivedAt: Date())
+            )
+        )
+
+        XCTAssertFalse(session.canSubmitApprovalFromIsland)
+        XCTAssertTrue(session.shouldSuppressInAppPromptControls(routePromptsToTerminal: true))
+    }
+
+    func testRoutePromptsToTerminalStillSuppressesQuestionControls() {
+        let intervention = SessionIntervention(
+            id: "question-1",
+            kind: .question,
+            title: "Question",
+            message: "Pick one",
+            options: [],
+            questions: [],
+            supportsSessionScope: false,
+            metadata: [:]
+        )
+        let session = SessionState(
+            sessionId: "question-session",
+            cwd: "/tmp/project",
+            intervention: intervention,
+            phase: .waitingForInput
+        )
+
         XCTAssertTrue(session.shouldSuppressInAppPromptControls(routePromptsToTerminal: true))
     }
 

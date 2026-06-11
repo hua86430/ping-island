@@ -151,9 +151,6 @@ struct HookEvent: Sendable {
     }
 
     nonisolated var expectsResponse: Bool {
-        if suppressInAppPrompt {
-            return false
-        }
         if isQoderIDENotifyOnlyClient {
             return false
         }
@@ -162,7 +159,12 @@ struct HookEvent: Sendable {
             .lowercased()
             .replacingOccurrences(of: "_", with: "")
             .replacingOccurrences(of: "-", with: "")
-        return (event == "PermissionRequest" && status == "waiting_for_approval")
+        let isPermissionRequest = event == "PermissionRequest" && status == "waiting_for_approval"
+        if suppressInAppPrompt, !isPermissionRequest {
+            return false
+        }
+
+        return isPermissionRequest
             || (event == "Notification" && status == "waiting_for_approval"
                 && clientInfo.isQwenCodeClient && notificationType == "permission_prompt")
             || (
