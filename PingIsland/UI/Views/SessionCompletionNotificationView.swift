@@ -119,9 +119,15 @@ enum SessionCompletionPreviewBuilder {
 
 enum SessionCompletionStateEvaluator {
     static func isCompletedReadySession(_ session: SessionState) -> Bool {
-        guard session.phase == .waitingForInput else { return false }
         guard session.intervention == nil else { return false }
+        guard session.phase == .waitingForInput || isCompletedCodexIdleSession(session) else {
+            return false
+        }
         return hasCompletedAssistantReply(for: session)
+    }
+
+    private static func isCompletedCodexIdleSession(_ session: SessionState) -> Bool {
+        session.provider == .codex && session.phase == .idle
     }
 
     static func allowsEndedNotificationAfterWaitingForInput(_ session: SessionState) -> Bool {

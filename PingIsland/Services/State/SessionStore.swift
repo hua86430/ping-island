@@ -3475,6 +3475,7 @@ actor SessionStore {
             previewText: snapshot.preview,
             phase: snapshot.phase
         )
+        let snapshotPhase = resolvedCodexSnapshotPhase(snapshot, currentSession: session)
 
         session.provider = .codex
         session.clientInfo = normalizedClientInfo(
@@ -3501,7 +3502,7 @@ actor SessionStore {
         let shouldPreserveExternalIntervention = !snapshot.isTurnInterrupted && shouldPreserveExternalCodexIntervention(
             current: session.intervention,
             incoming: snapshot.intervention,
-            nextPhase: snapshot.phase,
+            nextPhase: snapshotPhase,
             clientKind: session.clientInfo.kind
         )
         if !shouldPreserveExternalIntervention {
@@ -3511,28 +3512,28 @@ actor SessionStore {
             if let hookPermissionPhase = restoredCodexHookPermissionPhase(from: session.intervention) {
                 session.phase = hookPermissionPhase
             } else if !session.phase.needsAttention {
-                session.phase = snapshot.phase
+                session.phase = snapshotPhase
             }
-        } else if snapshot.isTurnInterrupted, snapshot.phase == .idle {
+        } else if snapshot.isTurnInterrupted, snapshotPhase == .idle {
             session.phase = .idle
         } else if shouldPreserveActivePhaseDuringApparentIdle(
             session: session,
-            incomingPhase: snapshot.phase,
+            incomingPhase: snapshotPhase,
             referenceDate: snapshot.updatedAt,
             previousLastActivity: existingLastActivity
         ) {
             // Keep the fresher active state until a stronger non-idle signal arrives.
         } else if shouldPreserveActivePhaseFromStaleCodexRefresh(
             currentPhase: session.phase,
-            incomingPhase: snapshot.phase,
+            incomingPhase: snapshotPhase,
             currentLastActivity: existingLastActivity,
             incomingActivityAt: snapshot.updatedAt
         ) {
             // Keep the fresher active state until Codex catches up with a newer snapshot.
         } else if case .none = session.intervention {
-            session.phase = snapshot.phase
-        } else if snapshot.phase.needsAttention {
-            session.phase = snapshot.phase
+            session.phase = snapshotPhase
+        } else if snapshotPhase.needsAttention {
+            session.phase = snapshotPhase
         }
         let hasIntervention: Bool
         if case .some = session.intervention {
@@ -3551,7 +3552,7 @@ actor SessionStore {
         }
         if shouldPreserveActivePhaseDuringApparentIdle(
             session: session,
-            incomingPhase: snapshot.phase,
+            incomingPhase: snapshotPhase,
             referenceDate: snapshot.updatedAt,
             previousLastActivity: existingLastActivity
         ) {
@@ -3586,6 +3587,27 @@ actor SessionStore {
                 )
             }
         }
+    }
+
+    private func resolvedCodexSnapshotPhase(
+        _ snapshot: CodexThreadSnapshot,
+        currentSession: SessionState?
+    ) -> SessionPhase {
+        guard snapshot.phase == .idle else {
+            return snapshot.phase
+        }
+        if case .some = currentSession?.intervention {
+            return snapshot.phase
+        }
+        if case .some = snapshot.intervention {
+            return snapshot.phase
+        }
+        guard !snapshot.isTurnInterrupted,
+              snapshot.hasCompletedAssistantReply else {
+            return snapshot.phase
+        }
+
+        return .waitingForInput
     }
 
     private func shouldPreserveExternalCodexIntervention(

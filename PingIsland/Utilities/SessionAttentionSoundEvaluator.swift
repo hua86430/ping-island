@@ -15,7 +15,7 @@ enum SessionAttentionSoundEvaluator {
     nonisolated static func shouldContributeToAttentionSoundEdge(_ session: SessionState) -> Bool {
         guard !session.autoApprovePermissions else { return false }
         return session.needsApprovalResponse
-            || (session.phase == .waitingForInput && session.intervention != nil)
+            || session.needsQuestionResponse
             || session.suppressInAppPromptControls
     }
 }

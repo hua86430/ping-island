@@ -41,8 +41,8 @@ struct NotchView: View {
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @State private var previousPendingIds: Set<String> = []
     @State private var manualAttentionTracker = SessionManualAttentionTracker()
-    @State private var previousWaitingForInputIds: Set<String> = []
-    @State private var waitingForInputTimestamps: [String: Date] = [:]  // sessionId -> when it entered waitingForInput
+    @State private var previousCompletedReadyIds: Set<String> = []
+    @State private var completionReadyTimestamps: [String: Date] = [:]
     @State private var isVisible: Bool = false
     @State private var isHovering: Bool = false
     @State private var isBouncing: Bool = false
@@ -186,7 +186,7 @@ struct NotchView: View {
         return sessionMonitor.instances.contains { session in
             guard SessionCompletionStateEvaluator.isCompletedReadySession(session) else { return false }
             // Only show if within the 30-second display window
-            if let enteredAt = waitingForInputTimestamps[session.stableId] {
+            if let enteredAt = completionReadyTimestamps[session.stableId] {
                 return now.timeIntervalSince(enteredAt) < displayDuration
             }
             return false
@@ -416,7 +416,7 @@ struct NotchView: View {
                 handleProcessingChange()
                 handleSessionSoundTransitions(instances)
                 handleManualAttentionChange(instances)
-                handleWaitingForInputChange(instances)
+                handleCompletedReadyChange(instances)
                 handleCompletionNotificationChange(instances)
             }
     }
@@ -879,9 +879,9 @@ struct NotchView: View {
             if oldStatus != .opened, newStatus == .opened {
                 recordIslandOpened()
             }
-            // Clear waiting-for-input timestamps only when manually opened (user acknowledged)
+            // Clear completed-ready timestamps only when manually opened (user acknowledged)
             if viewModel.openReason == .click || viewModel.openReason == .hover {
-                waitingForInputTimestamps.removeAll()
+                completionReadyTimestamps.removeAll()
                 clearCompletionNotifications(keepPanelOpen: true)
             }
         case .closed:
@@ -1012,9 +1012,9 @@ struct NotchView: View {
 
     private func primeStartupPresentationState(_ instances: [SessionState]) {
         previousPendingIds = Set(instances.filter(\.needsAttention).map(\.stableId))
-        previousWaitingForInputIds = Set(
+        previousCompletedReadyIds = Set(
             instances
-                .filter { $0.phase == .waitingForInput }
+                .filter { SessionCompletionStateEvaluator.isCompletedReadySession($0) }
                 .map(\.stableId)
         )
         _ = manualAttentionTracker.consumeNewAttentionSession(from: instances)
@@ -1079,32 +1079,23 @@ struct NotchView: View {
         viewModel.presentNotificationChat(for: targetSession)
     }
 
-    private func handleWaitingForInputChange(_ instances: [SessionState]) {
-        let allWaitingIds = Set(
-            instances
-                .filter { $0.phase == .waitingForInput }
-                .map(\.stableId)
-        )
-        let newWaitingIds = allWaitingIds.subtracting(previousWaitingForInputIds)
-
-        // Only completed sessions without intervention should get the temporary green checkmark.
+    private func handleCompletedReadyChange(_ instances: [SessionState]) {
         let completedSessions = instances.filter { SessionCompletionStateEvaluator.isCompletedReadySession($0) }
         let completedIds = Set(completedSessions.map(\.stableId))
+        let newCompletedIds = completedIds.subtracting(previousCompletedReadyIds)
 
-        // Track timestamps for newly waiting sessions
         let now = Date()
-        for session in completedSessions where newWaitingIds.contains(session.stableId) {
-            waitingForInputTimestamps[session.stableId] = now
+        for session in completedSessions where newCompletedIds.contains(session.stableId) {
+            completionReadyTimestamps[session.stableId] = now
         }
 
-        // Clean up timestamps for sessions no longer waiting
-        let staleIds = Set(waitingForInputTimestamps.keys).subtracting(completedIds)
+        let staleIds = Set(completionReadyTimestamps.keys).subtracting(completedIds)
         for staleId in staleIds {
-            waitingForInputTimestamps.removeValue(forKey: staleId)
+            completionReadyTimestamps.removeValue(forKey: staleId)
         }
+        previousCompletedReadyIds = completedIds
 
-        // Bounce the notch when a session newly enters waitingForInput state
-        if !newWaitingIds.isEmpty {
+        if !newCompletedIds.isEmpty {
             // Trigger bounce animation to get user's attention
             DispatchQueue.main.async {
                 isBouncing = true
@@ -1120,8 +1111,6 @@ struct NotchView: View {
                 handleProcessingChange()
             }
         }
-
-        previousWaitingForInputIds = allWaitingIds
     }
 
     private func primeCompletionNotificationTracking(_ instances: [SessionState]) {
@@ -1373,7 +1362,7 @@ struct NotchView: View {
             )
             previousCompletionSoundIds = Set(
                 instances
-                    .filter { $0.phase == .waitingForInput && $0.intervention == nil }
+                    .filter { SessionCompletionStateEvaluator.isCompletedReadySession($0) }
                     .map(\.stableId)
             )
             previousTaskErrorIds = Set(

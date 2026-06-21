@@ -1830,7 +1830,7 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         )
         previousCompletionSoundIds = Set(
             instances
-                .filter { $0.phase == .waitingForInput && $0.intervention == nil }
+                .filter { SessionCompletionStateEvaluator.isCompletedReadySession($0) }
                 .map(\.stableId)
         )
         previousTaskErrorIds = Set(

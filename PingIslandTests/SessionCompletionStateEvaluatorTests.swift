@@ -82,6 +82,38 @@ final class SessionCompletionStateEvaluatorTests: XCTestCase {
         XCTAssertTrue(SessionCompletionStateEvaluator.isCompletedReadySession(session))
     }
 
+    func testCodexIdleAssistantReplyIsCompletedReadySession() {
+        let session = SessionState(
+            sessionId: "codex-idle-final",
+            cwd: "/tmp/project",
+            provider: .codex,
+            clientInfo: SessionClientInfo.codexApp(threadId: "codex-idle-final"),
+            phase: .idle,
+            chatItems: [
+                ChatHistoryItem(id: "1", type: .user("修一下声音"), timestamp: Date(timeIntervalSince1970: 1)),
+                ChatHistoryItem(id: "2", type: .assistant("已经修好了。"), timestamp: Date(timeIntervalSince1970: 2))
+            ]
+        )
+
+        XCTAssertTrue(SessionCompletionStateEvaluator.hasCompletedAssistantReply(for: session))
+        XCTAssertTrue(SessionCompletionStateEvaluator.isCompletedReadySession(session))
+    }
+
+    func testNonCodexIdleAssistantReplyIsNotCompletedReadySession() {
+        let session = SessionState(
+            sessionId: "claude-idle-final",
+            cwd: "/tmp/project",
+            provider: .claude,
+            phase: .idle,
+            chatItems: [
+                ChatHistoryItem(id: "1", type: .assistant("Done"), timestamp: Date(timeIntervalSince1970: 1))
+            ]
+        )
+
+        XCTAssertTrue(SessionCompletionStateEvaluator.hasCompletedAssistantReply(for: session))
+        XCTAssertFalse(SessionCompletionStateEvaluator.isCompletedReadySession(session))
+    }
+
     func testCompletedReadySessionRejectsQuestionInterventionEvenWithAssistantReply() {
         let session = SessionState(
             sessionId: "question-intervention",

@@ -73,4 +73,17 @@ struct CodexThreadSnapshot: Equatable, Sendable {
     nonisolated var displayResultText: String? {
         latestResponseText ?? conversationInfo.lastMessage ?? preview
     }
+
+    nonisolated var hasCompletedAssistantReply: Bool {
+        for item in historyItems.reversed() {
+            switch item.type {
+            case .assistant:
+                return true
+            case .user, .thinking, .toolCall, .interrupted:
+                return false
+            }
+        }
+
+        return conversationInfo.lastMessageRole == "assistant"
+    }
 }

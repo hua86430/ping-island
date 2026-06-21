@@ -31,6 +31,18 @@ final class SessionAttentionSoundEvaluatorTests: XCTestCase {
         )
     }
 
+    func testQuestionInterventionContributesEvenIfPhaseStillProcessing() {
+        let session = makeSession(
+            autoApprovePermissions: false,
+            phase: .processing,
+            intervention: makeQuestionIntervention()
+        )
+
+        XCTAssertTrue(
+            SessionAttentionSoundEvaluator.shouldContributeToAttentionSoundEdge(session)
+        )
+    }
+
     func testTerminalRoutedPromptContributesWithoutIslandIntervention() {
         var session = makeSession(
             autoApprovePermissions: false,
