@@ -1048,6 +1048,28 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(groups.first?.childSessions.map(\.sessionId), ["codex-nested-child", "codex-child"])
     }
 
+    func testSessionListPrimaryTapKeepsCompactRowsExpandable() {
+        XCTAssertEqual(
+            SessionListRowClickBehavior.primaryTapAction(isMinimalCompactPresentation: true),
+            .toggleExpanded
+        )
+        XCTAssertEqual(
+            SessionListRowClickBehavior.primaryTapAction(isMinimalCompactPresentation: false),
+            .activate
+        )
+    }
+
+    func testSessionListDoubleTapActivatesWhenNoInAppResponseIsPending() {
+        XCTAssertEqual(
+            SessionListRowClickBehavior.doubleTapAction(needsInAppResponse: false),
+            .activate
+        )
+        XCTAssertEqual(
+            SessionListRowClickBehavior.doubleTapAction(needsInAppResponse: true),
+            .chat
+        )
+    }
+
     func testSubagentVisibilityModeAppliesToLinkedChildSessions() {
         let qoderChild = SessionState(
             sessionId: "qoder-child",
