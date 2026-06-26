@@ -252,4 +252,73 @@ final class SessionCompletionStateEvaluatorTests: XCTestCase {
             )
         )
     }
+
+    func testCompletionNotificationPolicyRejectsTrackedStaleCompletedTransition() {
+        let now = Date()
+        let session = SessionState(
+            sessionId: "tracked-stale-completed",
+            cwd: "/tmp/project",
+            provider: .codex,
+            clientInfo: SessionClientInfo.codexApp(threadId: "tracked-stale-completed"),
+            phase: .idle,
+            chatItems: [
+                ChatHistoryItem(
+                    id: "assistant",
+                    type: .assistant("Done earlier"),
+                    timestamp: now.addingTimeInterval(-3_600)
+                )
+            ],
+            lastActivity: now.addingTimeInterval(-3_600),
+            createdAt: now.addingTimeInterval(-3_600)
+        )
+
+        XCTAssertFalse(
+            SessionCompletionNotificationPolicy.shouldQueueCompletedNotification(
+                for: session,
+                previousPhase: .processing,
+                isEnabled: true,
+                now: now
+            )
+        )
+    }
+
+    func testCompletionNotificationPolicyRejectsTrackedStaleEndedTransition() {
+        let now = Date()
+        let session = SessionState(
+            sessionId: "tracked-stale-ended",
+            cwd: "/tmp/project",
+            phase: .ended,
+            lastActivity: now.addingTimeInterval(-3_600),
+            createdAt: now.addingTimeInterval(-3_600)
+        )
+
+        XCTAssertFalse(
+            SessionCompletionNotificationPolicy.shouldQueueEndedNotification(
+                for: session,
+                previousPhase: .processing,
+                isEnabled: true,
+                now: now
+            )
+        )
+    }
+
+    func testCompletionNotificationPolicyRejectsTrackedStaleCompactedTransition() {
+        let now = Date()
+        let session = SessionState(
+            sessionId: "tracked-stale-compacted",
+            cwd: "/tmp/project",
+            phase: .idle,
+            lastActivity: now.addingTimeInterval(-3_600),
+            createdAt: now.addingTimeInterval(-3_600)
+        )
+
+        XCTAssertFalse(
+            SessionCompletionNotificationPolicy.shouldQueueCompactedNotification(
+                for: session,
+                previousPhase: .compacting,
+                isEnabled: true,
+                now: now
+            )
+        )
+    }
 }

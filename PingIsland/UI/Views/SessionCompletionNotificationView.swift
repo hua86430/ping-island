@@ -156,7 +156,7 @@ enum SessionCompletionStateEvaluator {
 }
 
 enum SessionCompletionNotificationPolicy {
-    private static let untrackedSessionNotificationWindow: TimeInterval = 60
+    private static let notificationRecencyWindow: TimeInterval = 60
 
     static func shouldQueueCompletedNotification(
         for session: SessionState,
@@ -191,12 +191,13 @@ enum SessionCompletionNotificationPolicy {
     static func shouldQueueCompactedNotification(
         for session: SessionState,
         previousPhase: SessionPhase?,
-        isEnabled: Bool
+        isEnabled: Bool,
+        now: Date = Date()
     ) -> Bool {
         guard isEnabled else { return false }
         guard previousPhase == .compacting else { return false }
         guard session.phase != .compacting else { return false }
-        return true
+        return wasTrackedOrRecentlyCreated(session, previousPhase: previousPhase, now: now)
     }
 
     private static func wasTrackedOrRecentlyCreated(
@@ -204,12 +205,15 @@ enum SessionCompletionNotificationPolicy {
         previousPhase: SessionPhase?,
         now: Date
     ) -> Bool {
+        guard now.timeIntervalSince(session.lastActivity) <= notificationRecencyWindow else {
+            return false
+        }
+
         if previousPhase != nil {
             return true
         }
 
-        return now.timeIntervalSince(session.createdAt) <= untrackedSessionNotificationWindow
-            && now.timeIntervalSince(session.lastActivity) <= untrackedSessionNotificationWindow
+        return now.timeIntervalSince(session.createdAt) <= notificationRecencyWindow
     }
 }
 
