@@ -48,6 +48,7 @@ final class QoderWorkHookEventTimingTests: XCTestCase {
         XCTAssertNil(event.intervention)
         XCTAssertEqual(event.determinePhase(), .processing)
         XCTAssertEqual(event.sessionPhase, .processing)
+        XCTAssertTrue(event.shouldFilterBeforeApprovalHandling)
     }
 
     func testQoderWorkPreToolUseQuestionSurfacesIntervention() {
@@ -90,6 +91,7 @@ final class QoderWorkHookEventTimingTests: XCTestCase {
         XCTAssertEqual(event.intervention?.metadata["responseMode"], "external_only")
         XCTAssertTrue(event.intervention?.message.contains("暂不支持直接提交") ?? false)
         XCTAssertEqual(event.determinePhase(), .waitingForInput)
+        XCTAssertFalse(event.shouldFilterBeforeApprovalHandling)
     }
 
     func testQoderWorkPermissionRequestQuestionReusesStableInterventionID() {

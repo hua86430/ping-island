@@ -221,6 +221,10 @@ struct HookEvent: Sendable {
         }
     }
 
+    nonisolated var shouldFilterBeforeApprovalHandling: Bool {
+        isQoderWorkNonResponsiveToolEvent
+    }
+
     private nonisolated var isCodeBuddyCLIAskUserQuestionNotification: Bool {
         let normalizedMessage = message?
             .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1802,6 +1806,14 @@ class HookSocketServer {
 
         var event = envelope.hookEvent
         let expectsResponse = envelope.expectsResponse || event.expectsResponse
+
+        if event.shouldFilterBeforeApprovalHandling {
+            logger.debug(
+                "Filtering QoderWork non-responsive hook event=\(envelope.eventType, privacy: .public) session=\(event.sessionId.prefix(8), privacy: .public)"
+            )
+            close(clientSocket)
+            return
+        }
 
         if !expectsResponse,
            event.bridgeIntervention == nil,

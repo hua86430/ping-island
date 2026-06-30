@@ -218,6 +218,35 @@ public struct BridgeEnvelope: Codable, Equatable, Sendable, Identifiable {
         self.metadata = metadata
         self.sentAt = sentAt
     }
+
+    public var shouldFilterBeforeApprovalHandling: Bool {
+        isQoderWorkNonResponsiveToolEvent
+    }
+
+    public var isQoderWorkNonResponsiveToolEvent: Bool {
+        guard expectsResponse == false else { return false }
+        guard eventType == "PreToolUse" || eventType == "PostToolUse" || eventType == "PermissionRequest" else {
+            return false
+        }
+
+        let normalizedClientKind = metadata["client_kind"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        if normalizedClientKind == "qoderwork" {
+            return true
+        }
+
+        return [
+            terminalContext.terminalBundleID,
+            terminalContext.ideBundleID,
+            metadata["terminal_bundle_id"],
+            metadata["client_bundle_id"]
+        ].contains { value in
+            value?
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased() == "com.qoder.work"
+        }
+    }
 }
 
 public indirect enum JSONValue: Codable, Equatable, Sendable {
