@@ -4,7 +4,7 @@
 
 ## 待處理
 
-- [ ] AskUserQuestion 劫持改非阻塞預覽 — spec 就緒，未實作
+- [ ] AskUserQuestion 劫持改非阻塞預覽 — plan 就緒，實作中
   - desc: 加一個 opt-in 設定 toggle（預設關）。開了 → Claude AskUserQuestion 非阻塞（終端 render 原生 picker），島只顯示唯讀預覽；關了維持現況。spec `docs/superpowers/specs/2026-07-01-askuserquestion-preview-design.md`。
 
 - [ ] cursor-follow：島跨螢幕跟隨游標、消除搬移延遲 — 計畫就緒，未實作
