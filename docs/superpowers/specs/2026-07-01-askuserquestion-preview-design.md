@@ -1,7 +1,14 @@
 # Non-blocking preview for Claude AskUserQuestion
 
 Date: 2026-07-01
-Status: approved (design), pending implementation plan
+Status: SUPERSEDED — approach proven infeasible; do not implement
+Superseded by: `docs/superpowers/specs/2026-07-02-askuserquestion-terminal-native-design.md`
+
+> This approach (non-blocking PreToolUse + read-only island preview) was
+> implemented, then reverted (`c35acc4`, `14b84e3`). A non-blocking AskUserQuestion
+> hook makes Claude **dismiss** the question outright (verified by screen
+> recording). The replacement design (full hook exclusion) is in the superseding
+> spec above.
 
 ## Problem
 
