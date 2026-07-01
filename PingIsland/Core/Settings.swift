@@ -21,6 +21,7 @@ enum AppSettingsDefaultKeys {
     nonisolated static let analyticsEnabled = TelemetryConsent.analyticsEnabledKey
     nonisolated static let analyticsConsentPromptCompleted = "analyticsConsentPromptCompleted"
     static let terminalHandlesAskUserQuestion = "terminalHandlesAskUserQuestion"
+    static let notificationFeedMode = "notificationFeedMode"
 }
 
 enum AppLanguage: String, CaseIterable, Identifiable {
@@ -964,6 +965,17 @@ final class AppSettingsStore: ObservableObject {
         }
     }
 
+    @Published var notificationFeedMode: Bool {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(notificationFeedMode, forKey: AppSettingsDefaultKeys.notificationFeedMode)
+            recordTelemetrySettingChange(
+                key: AppSettingsDefaultKeys.notificationFeedMode,
+                value: notificationFeedMode.description
+            )
+        }
+    }
+
     @Published var autoRoutePromptsToTerminalWhenIdleEnabled: Bool {
         didSet {
             guard !isBootstrapping else { return }
@@ -1580,6 +1592,12 @@ final class AppSettingsStore: ObservableObject {
             exists: persistedKeys.contains(AppSettingsDefaultKeys.terminalHandlesAskUserQuestion),
             default: false
         ))
+        _notificationFeedMode = Published(initialValue: Self.boolValue(
+            from: defaults,
+            key: AppSettingsDefaultKeys.notificationFeedMode,
+            exists: persistedKeys.contains(AppSettingsDefaultKeys.notificationFeedMode),
+            default: false
+        ))
         _autoRoutePromptsToTerminalWhenIdleEnabled = Published(initialValue: Self.boolValue(
             from: defaults,
             key: Keys.autoRoutePromptsToTerminalWhenIdleEnabled,
@@ -1671,6 +1689,11 @@ enum AppSettings {
     static var soundEnabled: Bool {
         get { shared.soundEnabled }
         set { shared.soundEnabled = newValue }
+    }
+
+    static var notificationFeedMode: Bool {
+        get { shared.notificationFeedMode }
+        set { shared.notificationFeedMode = newValue }
     }
 
     static var soundVolume: Double {

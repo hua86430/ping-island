@@ -3184,6 +3184,13 @@ private struct SettingsPanelContentView: View {
                         .disabled(!settings.autoRoutePromptsToTerminalWhenIdleEnabled)
                         .opacity(settings.autoRoutePromptsToTerminalWhenIdleEnabled ? 1 : 0.45)
                 }
+                SettingsLineDivider()
+
+                SettingsToggleLine(
+                    title: "通知中心模式",
+                    subtitle: "开启后展开的岛只显示有新动态的 session（未读），点一下跳到终端并清除该通知；右上角可清除全部。关闭则显示全部 session。",
+                    isOn: $settings.notificationFeedMode
+                )
             }
 
             SettingsSectionCard(title: "Hook 调试日志") {

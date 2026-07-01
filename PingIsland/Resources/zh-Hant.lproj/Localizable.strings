@@ -154,6 +154,8 @@
 "开启后终端中的 Claude / Codex 审批仍会保留；如果 Island 有可回写的审批请求，也可以直接在 Island 里批准或拒绝。" = "開啟後終端機中的 Claude / Codex 核准仍會保留；如果 Island 有可回寫的核准請求，也可以直接在 Island 裡核准或拒絕。";
 "让终端处理 Claude 的提问" = "讓終端機處理 Claude 的提問";
 "开启后 Claude 的 AskUserQuestion 改由终端原生菜单处理，灵动岛不再显示该提问；下一个 Claude session 生效。" = "開啟後 Claude 的 AskUserQuestion 改由終端機原生選單處理；靈動島仍會顯示唯讀提醒，告訴你哪個 session 需要回答，點一下即可跳到終端機作答。下一個 Claude session 生效。";
+"通知中心模式" = "通知中心模式";
+"开启后展开的岛只显示有新动态的 session（未读），点一下跳到终端并清除该通知；右上角可清除全部。关闭则显示全部 session。" = "開啟後展開的島只顯示有新動態的 session（未讀），點一下跳到終端機並清除該通知；右上角可清除全部。關閉則顯示全部 session。";
 "Hook 调试日志" = "Hook 除錯日誌";
 "记录 Hook 调试日志" = "記錄 Hook 除錯日誌";
 "关闭后 bridge 不再追加 ~/.ping-island-debug 下的 hook 调试记录，并在下次 hook 触发时清理既有日志。" = "關閉後 bridge 不再追加 ~/.ping-island-debug 下的 hook 除錯記錄，並在下次 hook 觸發時清理既有日誌。";

@@ -49,4 +49,20 @@ final class NotificationFeedTests: XCTestCase {
         session.lastSeenAt = Date()
         XCTAssertFalse(session.hasUnread)
     }
+
+    @MainActor
+    func testNotificationFeedModeDefaultsToFalseAndPersists() {
+        let key = AppSettingsDefaultKeys.notificationFeedMode
+        let suiteName = "test-\(key)-\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        defer { suite.removePersistentDomain(forName: suiteName) }
+
+        let store = AppSettingsStore(defaults: suite, bridgeRuntimeConfigWriter: { _ in })
+
+        XCTAssertFalse(store.notificationFeedMode)
+        store.notificationFeedMode = true
+        XCTAssertTrue(suite.bool(forKey: key))
+        store.notificationFeedMode = false
+        XCTAssertFalse(suite.bool(forKey: key))
+    }
 }

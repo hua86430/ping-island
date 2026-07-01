@@ -154,6 +154,8 @@
 "开启后终端中的 Claude / Codex 审批仍会保留；如果 Island 有可回写的审批请求，也可以直接在 Island 里批准或拒绝。" = "When on, Claude / Codex approvals stay available in the terminal; if Island can write the response back, you can still approve or deny directly in Island.";
 "让终端处理 Claude 的提问" = "Let the terminal handle Claude's questions";
 "开启后 Claude 的 AskUserQuestion 改由终端原生菜单处理，灵动岛不再显示该提问；下一个 Claude session 生效。" = "When on, Claude's AskUserQuestion is handled by the terminal's native picker; the island still shows a read-only reminder that the session needs an answer — click it to jump to the terminal. Takes effect on the next Claude session.";
+"通知中心模式" = "Notification center mode";
+"开启后展开的岛只显示有新动态的 session（未读），点一下跳到终端并清除该通知；右上角可清除全部。关闭则显示全部 session。" = "When on, the expanded island lists only sessions with new activity (unread); click one to jump to its terminal and clear it, or use Clear All in the top-right. When off, all sessions are listed.";
 "Hook 调试日志" = "Hook debug logs";
 "记录 Hook 调试日志" = "Record hook debug logs";
 "关闭后 bridge 不再追加 ~/.ping-island-debug 下的 hook 调试记录，并在下次 hook 触发时清理既有日志。" = "When off, the bridge stops appending hook debug records under ~/.ping-island-debug and cleans existing logs the next time a hook fires.";
