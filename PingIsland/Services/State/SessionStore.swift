@@ -2536,6 +2536,13 @@ actor SessionStore {
             guard existingId != newSessionId else { continue }
             guard existing.provider == provider else { continue }
             guard existing.cwd == cwd else { continue }
+
+            // Only clean up a relaunch orphan from the SAME terminal surface.
+            // Two Claude instances in the same cwd but different terminals are
+            // legitimate concurrent sessions and must not remove each other.
+            guard let terminalIdentity = session.terminalDedupIdentity,
+                  existing.terminalDedupIdentity == terminalIdentity else { continue }
+
             guard existing.phase != .ended else { continue }
             guard !existing.needsManualAttention else { continue }
 
