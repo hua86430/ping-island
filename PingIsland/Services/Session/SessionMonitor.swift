@@ -840,7 +840,7 @@ class SessionMonitor: ObservableObject {
         let primaryVisibleSessions = sessions.filter {
             !$0.shouldHideFromPrimaryUI && $0.shouldDisplaySubagent(in: visibilityMode)
         }
-        let dedupedSessions = deduplicateSameProjectClaudeSessions(from: primaryVisibleSessions)
+        let dedupedSessions = Self.deduplicateSameProjectClaudeSessions(from: primaryVisibleSessions)
         return dedupedSessions.filter { candidate in
             guard shouldCheckDuplicateVisibility(for: candidate) else {
                 return true
@@ -856,7 +856,7 @@ class SessionMonitor: ObservableObject {
     /// When Claude is resumed or restarted, concurrent hook events can create multiple
     /// sessions for the same project before endOrphanedSessions has a chance to clean up.
     /// Keep only the most recently active session per provider + cwd pair.
-    private func deduplicateSameProjectClaudeSessions(
+    nonisolated static func deduplicateSameProjectClaudeSessions(
         from sessions: [SessionState]
     ) -> [SessionState] {
         var bestByKey: [String: SessionState] = [:]
@@ -866,7 +866,8 @@ class SessionMonitor: ObservableObject {
             guard session.provider == .claude else { continue }
             let cwd = session.cwd
             guard !cwd.isEmpty else { continue }
-            let key = "\(session.provider.rawValue):\(cwd)"
+            let terminal = session.terminalDedupIdentity ?? "session:\(session.sessionId)"
+            let key = "\(session.provider.rawValue):\(cwd):\(terminal)"
             if let existing = bestByKey[key] {
                 if session.lastActivity > existing.lastActivity {
                     bestByKey[key] = session

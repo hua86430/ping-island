@@ -55,4 +55,27 @@ final class SessionTerminalDedupTests: XCTestCase {
         XCTAssertNil(makeSession(tty: nil).terminalDedupIdentity)
         XCTAssertNil(makeSession(tty: "   ").terminalDedupIdentity)
     }
+
+    // MARK: - deduplicateSameProjectClaudeSessions
+
+    func testDifferentTerminalsSameCwdStaySeparate() {
+        let a = makeSession(sessionId: "a", tty: "ttys001", lastActivity: Date(timeIntervalSince1970: 100))
+        let b = makeSession(sessionId: "b", tty: "ttys002", lastActivity: Date(timeIntervalSince1970: 200))
+        let result = SessionMonitor.deduplicateSameProjectClaudeSessions(from: [a, b])
+        XCTAssertEqual(Set(result.map(\.sessionId)), ["a", "b"])
+    }
+
+    func testSameTerminalSameCwdCollapsesToMostRecent() {
+        let old = makeSession(sessionId: "old", tty: "ttys001", lastActivity: Date(timeIntervalSince1970: 100))
+        let new = makeSession(sessionId: "new", tty: "ttys001", lastActivity: Date(timeIntervalSince1970: 200))
+        let result = SessionMonitor.deduplicateSameProjectClaudeSessions(from: [old, new])
+        XCTAssertEqual(result.map(\.sessionId), ["new"])
+    }
+
+    func testNoTerminalIdentitySessionsStaySeparate() {
+        let a = makeSession(sessionId: "a", tty: nil, lastActivity: Date(timeIntervalSince1970: 100))
+        let b = makeSession(sessionId: "b", tty: nil, lastActivity: Date(timeIntervalSince1970: 200))
+        let result = SessionMonitor.deduplicateSameProjectClaudeSessions(from: [a, b])
+        XCTAssertEqual(Set(result.map(\.sessionId)), ["a", "b"])
+    }
 }
