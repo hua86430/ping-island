@@ -538,6 +538,17 @@ private struct HoverQuestionInterventionCard: View {
     let onActionCompleted: () -> Void
 
     var body: some View {
+        if intervention.isTerminalRoutedReminder {
+            TerminalRoutedReminderLine()
+                .padding(.top, 12)
+                .padding(.bottom, 18)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            fullBody
+        }
+    }
+
+    private var fullBody: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
@@ -657,6 +668,21 @@ private struct HoverTerminalRoutedPromptNotice: View {
         .foregroundColor(.white.opacity(0.64))
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// Minimal one-line reminder shown when an AskUserQuestion is terminal-routed
+/// (`SessionIntervention.isTerminalRoutedReminder`). The enclosing card handles
+/// the tap that focuses the terminal.
+struct TerminalRoutedReminderLine: View {
+    var fontSize: CGFloat = 12
+
+    var body: some View {
+        Text(appLocalized: "需要你回答 · 点一下到终端作答")
+            .font(.system(size: fontSize, weight: .medium))
+            .foregroundColor(.white.opacity(0.82))
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

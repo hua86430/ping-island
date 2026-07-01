@@ -972,6 +972,14 @@ struct SessionIntervention: Equatable, Identifiable, Sendable {
         metadata["responseMode"] != "external_only"
     }
 
+    /// True when this question was routed to the terminal by the
+    /// `terminalHandlesAskUserQuestion` toggle. Card surfaces render a minimal
+    /// one-line reminder (no title/message/options) and a tap focuses the
+    /// terminal, since the user answers Claude's native picker there.
+    nonisolated var isTerminalRoutedReminder: Bool {
+        metadata["terminalRoutedReminder"] == "true"
+    }
+
     nonisolated var offersSessionScopedApproval: Bool {
         supportsSessionScope || options.contains { option in
             let normalizedId = Self.normalizedApprovalOptionIdentifier(option.id)

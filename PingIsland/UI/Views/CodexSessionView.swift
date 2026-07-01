@@ -151,7 +151,24 @@ struct CodexSessionView: View {
         )
     }
 
+    @ViewBuilder
     private func interventionCard(_ intervention: SessionIntervention) -> some View {
+        if intervention.isTerminalRoutedReminder {
+            TerminalRoutedReminderLine()
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        .fill(Color.white.opacity(0.06))
+                )
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .onTapGesture { openClient() }
+        } else {
+            fullInterventionCard(intervention)
+        }
+    }
+
+    private func fullInterventionCard(_ intervention: SessionIntervention) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(intervention.title)
                 .font(.system(size: 14, weight: .semibold))

@@ -314,6 +314,7 @@
 "你：" = "You:";
 "状态：" = "Status:";
 "需要你的输入" = "Needs your input";
+"需要你回答 · 点一下到终端作答" = "Answer needed · click to jump to the terminal";
 "等待你补充输入" = "Waiting for your input";
 "等待批准" = "Waiting for approval";
 "等待批准 %@" = "Waiting for approval %@";

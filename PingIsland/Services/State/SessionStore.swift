@@ -4036,7 +4036,8 @@ actor SessionStore {
         guard let intervention = claudeTranscriptQuestionIntervention(
             toolUseId: pendingQuestionTool.id,
             tool: pendingQuestionTool.tool,
-            session: session
+            session: session,
+            terminalRouted: terminalRouted
         ) else {
             return
         }
@@ -4050,7 +4051,8 @@ actor SessionStore {
     private func claudeTranscriptQuestionIntervention(
         toolUseId: String,
         tool: ToolCallItem,
-        session: SessionState
+        session: SessionState,
+        terminalRouted: Bool
     ) -> SessionIntervention? {
         guard let rawQuestions = tool.input["questions"],
               let data = rawQuestions.data(using: .utf8),
@@ -4122,6 +4124,20 @@ actor SessionStore {
             return nil
         }
 
+        var metadata: [String: String] = [
+            "toolName": "AskUserQuestion",
+            "toolInputJSON": payloadJSON,
+            "originalToolUseId": toolUseId,
+            "source": "claudeTranscriptQuestion"
+        ]
+        // Marker set only when the toggle routed this question to the terminal.
+        // The card surfaces read it to render a minimal one-line reminder
+        // instead of the full question framing, since the user answers in the
+        // terminal, not on the Island.
+        if terminalRouted {
+            metadata["terminalRoutedReminder"] = "true"
+        }
+
         return SessionIntervention(
             id: toolUseId,
             kind: .question,
@@ -4130,12 +4146,7 @@ actor SessionStore {
             options: [],
             questions: parsedQuestions,
             supportsSessionScope: false,
-            metadata: [
-                "toolName": "AskUserQuestion",
-                "toolInputJSON": payloadJSON,
-                "originalToolUseId": toolUseId,
-                "source": "claudeTranscriptQuestion"
-            ]
+            metadata: metadata
         )
     }
 

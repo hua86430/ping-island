@@ -510,7 +510,23 @@ struct ChatView: View {
 
     // MARK: - Question Form
 
+    @ViewBuilder
     private func questionForm(_ intervention: SessionIntervention) -> some View {
+        if intervention.isTerminalRoutedReminder {
+            TerminalRoutedReminderLine()
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color.black.opacity(0.2))
+                .contentShape(Rectangle())
+                .onTapGesture { focusTerminal() }
+                .zIndex(1)
+        } else {
+            fullQuestionForm(intervention)
+        }
+    }
+
+    private func fullQuestionForm(_ intervention: SessionIntervention) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .top, spacing: 10) {
                 VStack(alignment: .leading, spacing: 4) {
