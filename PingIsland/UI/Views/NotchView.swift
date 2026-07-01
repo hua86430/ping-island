@@ -228,6 +228,11 @@ struct NotchView: View {
         representativeClosedSession ?? latestHookMessageSession
     }
 
+    private var unreadFeedCount: Int {
+        guard AppSettings.shared.notificationFeedMode else { return 0 }
+        return sessionMonitor.instances.filter(\.hasUnread).count
+    }
+
     private var closedMascotKind: MascotKind {
         settings.mascotKind(for: latestMascotSourceSession(from: sessionMonitor.instances)?.mascotClient)
     }
@@ -690,6 +695,18 @@ struct NotchView: View {
                         }
                         .frame(width: closedTrailingWidth, alignment: .trailing)
                     }
+
+                    // Unread notification-feed badge. Independent of the
+                    // attention/usage/session-count indicator above so it
+                    // stays visible even when that indicator is showing.
+                    if viewModel.status != .opened && unreadFeedCount > 0 {
+                        Text("\(unreadFeedCount)")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color.red.opacity(0.85)))
+                    }
                 }
             }
         }
@@ -741,7 +758,15 @@ struct NotchView: View {
     }
 
     private var closedCenterWidth: CGFloat {
-        max(0, closedInnerWidth - closedLeadingWidth - closedTrailingWidth + (isBouncing ? 16 : 0))
+        max(0, closedInnerWidth - closedLeadingWidth - closedTrailingWidth - unreadFeedBadgeReservedWidth + (isBouncing ? 16 : 0))
+    }
+
+    // Reserves room for the unread-feed badge out of the fixed-width closed
+    // notch so it never grows the window past its configured footprint.
+    // ponytail: fixed slot sized for up to 2-digit counts; larger counts are
+    // an unlikely edge case and may spill a few points past the reservation.
+    private var unreadFeedBadgeReservedWidth: CGFloat {
+        (viewModel.status != .opened && unreadFeedCount > 0) ? 24 : 0
     }
 
     private var compactCenterContentWidth: CGFloat {
