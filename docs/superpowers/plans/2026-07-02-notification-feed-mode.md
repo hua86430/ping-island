@@ -551,6 +551,57 @@ git commit -m "docs: note notification feed mode routing"
 
 ---
 
+### Task 6: Live local self-test (jack-loop, controller-run — NOT a dispatched subagent task)
+
+Per jack-loop discipline: implementation is not "done" until the feature is exercised on the real app locally with observed output. The controller runs this personally after Task 5, BEFORE any release or completion report. Every claim in the final report cites evidence produced here (screenshots read back, command output, frontmost checks). Anything that cannot be verified gets reported as an explicit gap, never claimed.
+
+**Proven tooling (all validated in this repo's earlier sessions):**
+- `screencapture -x -t png /tmp/…png` then READ the image to verify what's on screen.
+- `osascript -e 'tell application "System Events" to get name of first process whose frontmost is true'` (automation permission granted) to verify terminal focus.
+- Synthetic session injection via the real bridge (registers a session in the live app):
+  ```bash
+  SID="feed-test-0001"; CWD="/Users/jack.huang/pi-feed-test"; mkdir -p "$CWD"
+  TP="$HOME/.claude/projects/-Users-jack-huang-pi-feed-test/$SID.jsonl"; mkdir -p "$(dirname "$TP")"; touch "$TP"
+  python3 -c "import json;print(json.dumps({'session_id':'$SID','transcript_path':'$TP','cwd':'$CWD','hook_event_name':'PostToolUse','tool_name':'Bash','tool_input':{'command':'echo hi'},'tool_response':{'stdout':'hi'}}))" \
+    | ISLAND_SOCKET_PATH=/tmp/island.sock PING_ISLAND_BRIDGE_CONFIG=$HOME/.ping-island/bridge-config.json \
+      TTY=/dev/ttys001 TERM_PROGRAM=ghostty PWD="$CWD" __CFBundleIdentifier=com.mitchellh.ghostty \
+      $HOME/.ping-island/bin/ping-island-bridge --source claude
+  ```
+  Re-sending this event later bumps `lastActivity` → drives a session unread on demand.
+- Debug app shares bundle id/defaults with production: quit production, launch `~/Library/Developer/Xcode/DerivedData/PingIsland-*/Build/Products/Debug/Ping Island.app`.
+- Toggle without UI: `defaults write com.wudanwu.PingIsland notificationFeedMode -bool true` BEFORE launching the app (the store reads defaults at bootstrap).
+- Click simulation: try `brew install cliclick` first; fallback `python3 -c 'import Quartz'` CGEvent clicks; if neither is available, do the visual-only checks and REPORT the untested interactions as a gap (do not fake or skip silently). Screen coordinates: read a fresh screencapture to locate the island/buttons; divide pixel coords by the display scale factor for the click tool.
+
+- [ ] **Step 1: Launch the Debug build with feed mode on**
+
+Quit production Ping Island (`osascript -e 'tell application "Ping Island" to quit'`), `defaults write com.wudanwu.PingIsland notificationFeedMode -bool true`, launch the Debug app, wait 3s, `screencapture` → READ: collapsed island present, no unread badge yet (feed starts empty on launch).
+
+- [ ] **Step 2: Drive one session unread**
+
+Inject the bridge event above (fresh SID). Wait 2s. `screencapture` → READ: collapsed island now shows the unread count badge "1".
+
+- [ ] **Step 3: Open the island → feed shows the row**
+
+Open the opened list (click the island via cliclick/Quartz at its on-screen position; if no click tool, use the configured session-list global shortcut via System Events keystroke if one is set). `screencapture` → READ: feed header "新通知" + "清除全部" top-right, exactly one row for `pi-feed-test`, no other sessions listed.
+
+- [ ] **Step 4: Tap the row → focus + clear**
+
+Click the row. Then: (a) `osascript` frontmost check → expect `ghostty`; (b) reopen the island, `screencapture` → READ: feed empty state "沒有新通知", badge gone.
+
+- [ ] **Step 5: Reappear on new activity + Clear All**
+
+Re-send the bridge event for the same SID plus a second SID → badge "2", feed lists both (newest first — verify order by which was sent last). Click "清除全部" → `screencapture` → feed empty, badge gone.
+
+- [ ] **Step 6: Relaunch-empty + toggle-off parity**
+
+Relaunch the Debug app (feed mode still on) with the two synthetic sessions still tracked → `screencapture` → feed empty (all seen at launch). Then `defaults write com.wudanwu.PingIsland notificationFeedMode -bool false`, relaunch, open the island → `screencapture` → the ORIGINAL full session list renders (toggle-off parity).
+
+- [ ] **Step 7: Cleanup + evidence bundle**
+
+Quit Debug app; remove `~/pi-feed-test`, the synthetic transcript dir, and archive/ignore the synthetic sessions (relaunch clears in-memory state); relaunch production Ping Island. Write the evidence summary (each step: command run + what the screenshot showed) into `.superpowers/sdd/feed-selftest-report.md`. The completion report to the user quotes this evidence; any step that could not be executed (e.g. no click tool) is listed as an explicit untested gap.
+
+---
+
 ## Self-Review
 
 **Spec coverage:** toggle default off → Task 2; unread model + relaunch-empty (default `lastSeenAt = Date()`) → Task 1; feed unread-only newest-first + 30-min exemption + Clear All + tap-focus-and-clear + empty state → Task 3; collapsed badge → Task 4; toggle-off parity → Tasks 3/4 gating (`notificationFeedMode` guards every new path); testing list in spec → Tasks 1-3 tests; docs → Task 5.
