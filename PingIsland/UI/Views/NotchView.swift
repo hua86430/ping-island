@@ -233,6 +233,10 @@ struct NotchView: View {
         return sessionMonitor.instances.filter(\.hasUnread).count
     }
 
+    private var showsUnreadFeedBadge: Bool {
+        viewModel.status != .opened && unreadFeedCount > 0
+    }
+
     private var closedMascotKind: MascotKind {
         settings.mascotKind(for: latestMascotSourceSession(from: sessionMonitor.instances)?.mascotClient)
     }
@@ -699,7 +703,7 @@ struct NotchView: View {
                     // Unread notification-feed badge. Independent of the
                     // attention/usage/session-count indicator above so it
                     // stays visible even when that indicator is showing.
-                    if viewModel.status != .opened && unreadFeedCount > 0 {
+                    if showsUnreadFeedBadge {
                         Text("\(unreadFeedCount)")
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(.white.opacity(0.9))
@@ -766,7 +770,7 @@ struct NotchView: View {
     // ponytail: fixed slot sized for up to 2-digit counts; larger counts are
     // an unlikely edge case and may spill a few points past the reservation.
     private var unreadFeedBadgeReservedWidth: CGFloat {
-        (viewModel.status != .opened && unreadFeedCount > 0) ? 24 : 0
+        showsUnreadFeedBadge ? 24 : 0
     }
 
     private var compactCenterContentWidth: CGFloat {
