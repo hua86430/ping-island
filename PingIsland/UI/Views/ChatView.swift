@@ -513,14 +513,19 @@ struct ChatView: View {
     @ViewBuilder
     private func questionForm(_ intervention: SessionIntervention) -> some View {
         if intervention.isTerminalRoutedReminder {
-            TerminalRoutedReminderLine()
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.black.opacity(0.2))
-                .contentShape(Rectangle())
-                .onTapGesture { focusTerminal() }
-                .zIndex(1)
+            // Use a Button (not .onTapGesture): inside the notch/detached panel
+            // a plain tap gesture on padded content is unreliable, but Buttons
+            // reliably capture clicks here (same as the answer buttons).
+            Button(action: { focusTerminal() }) {
+                TerminalRoutedReminderLine()
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.black.opacity(0.2))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .zIndex(1)
         } else {
             fullQuestionForm(intervention)
         }
