@@ -23,7 +23,6 @@ enum BridgeRuntimeConfigWriter {
     nonisolated static func payloadData(_ config: BridgeRuntimeConfigSnapshot) -> Data? {
         let payload: [String: Any] = [
             "routePromptsToTerminal": config.routePromptsToTerminal,
-            "claudeQuestionPreviewOnly": config.claudeQuestionPreviewOnly,
             "debugLoggingEnabled": config.debugLoggingEnabled,
             "debugLogRetentionDays": config.debugLogRetentionDays,
             "debugLogMaxDirectoryMegabytes": config.debugLogMaxDirectoryMegabytes
@@ -46,20 +45,17 @@ struct BridgeRuntimeConfigSnapshot: Equatable, Sendable {
     static let maximumDebugLogMaxDirectoryMegabytes = 1024
 
     let routePromptsToTerminal: Bool
-    let claudeQuestionPreviewOnly: Bool
     let debugLoggingEnabled: Bool
     let debugLogRetentionDays: Int
     let debugLogMaxDirectoryMegabytes: Int
 
     init(
         routePromptsToTerminal: Bool,
-        claudeQuestionPreviewOnly: Bool = false,
         debugLoggingEnabled: Bool = Self.defaultDebugLoggingEnabled,
         debugLogRetentionDays: Int = Self.defaultDebugLogRetentionDays,
         debugLogMaxDirectoryMegabytes: Int = Self.defaultDebugLogMaxDirectoryMegabytes
     ) {
         self.routePromptsToTerminal = routePromptsToTerminal
-        self.claudeQuestionPreviewOnly = claudeQuestionPreviewOnly
         self.debugLoggingEnabled = debugLoggingEnabled
         self.debugLogRetentionDays = Self.clampedDebugLogRetentionDays(debugLogRetentionDays)
         self.debugLogMaxDirectoryMegabytes = Self.clampedDebugLogMaxDirectoryMegabytes(debugLogMaxDirectoryMegabytes)

@@ -2,16 +2,13 @@ import Foundation
 
 public struct BridgeRuntimeConfig: Sendable, Equatable {
     public var routePromptsToTerminal: Bool
-    public var claudeQuestionPreviewOnly: Bool
     public var debugLogPolicy: BridgeDebugLogPolicy
 
     public init(
         routePromptsToTerminal: Bool = false,
-        claudeQuestionPreviewOnly: Bool = false,
         debugLogPolicy: BridgeDebugLogPolicy = .default
     ) {
         self.routePromptsToTerminal = routePromptsToTerminal
-        self.claudeQuestionPreviewOnly = claudeQuestionPreviewOnly
         self.debugLogPolicy = debugLogPolicy
     }
 
@@ -44,10 +41,8 @@ public struct BridgeRuntimeConfig: Sendable, Equatable {
             return .default
         }
         let route = (json["routePromptsToTerminal"] as? Bool) ?? false
-        let previewOnly = (json["claudeQuestionPreviewOnly"] as? Bool) ?? false
         return BridgeRuntimeConfig(
             routePromptsToTerminal: route,
-            claudeQuestionPreviewOnly: previewOnly,
             debugLogPolicy: BridgeDebugLogPolicy(jsonObject: json)
         )
     }
@@ -55,7 +50,6 @@ public struct BridgeRuntimeConfig: Sendable, Equatable {
     public var jsonObject: [String: Any] {
         var object = debugLogPolicy.jsonObject
         object["routePromptsToTerminal"] = routePromptsToTerminal
-        object["claudeQuestionPreviewOnly"] = claudeQuestionPreviewOnly
         return object
     }
 }
