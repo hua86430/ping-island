@@ -13,6 +13,9 @@ struct NotchGeometry: Equatable, Sendable {
     let deviceNotchRect: CGRect
     let screenRect: CGRect
     let windowHeight: CGFloat
+    /// Menu bar height on this screen, used as the closed-bar height on
+    /// non-notch displays where there is no camera-housing safe area.
+    var menuBarHeight: CGFloat = 0
 
     /// The notch rect in screen coordinates (for hit testing with global mouse position)
     var notchScreenRect: CGRect {

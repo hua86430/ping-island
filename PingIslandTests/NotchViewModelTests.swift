@@ -143,6 +143,40 @@ final class NotchViewModelTests: XCTestCase {
         }
     }
 
+    func testNonNotchClosedHeightUsesDetectedMenuBarHeight() async {
+        await MainActor.run {
+            let viewModel = NotchViewModel(
+                deviceNotchRect: .zero,
+                screenRect: CGRect(x: 0, y: 0, width: 1440, height: 900),
+                windowHeight: 320,
+                hasPhysicalNotch: false,
+                menuBarHeight: 24,
+                enableEventMonitoring: false,
+                observeSystemEnvironment: false,
+                fullscreenActivityProvider: { _ in false }
+            )
+
+            XCTAssertEqual(viewModel.closedHeight, 24)
+        }
+    }
+
+    func testNonNotchClosedHeightFallsBackWhenMenuBarHeightUnavailable() async {
+        await MainActor.run {
+            let viewModel = NotchViewModel(
+                deviceNotchRect: .zero,
+                screenRect: CGRect(x: 0, y: 0, width: 1440, height: 900),
+                windowHeight: 320,
+                hasPhysicalNotch: false,
+                menuBarHeight: 0,
+                enableEventMonitoring: false,
+                observeSystemEnvironment: false,
+                fullscreenActivityProvider: { _ in false }
+            )
+
+            XCTAssertEqual(viewModel.closedHeight, ScreenNotchMetrics.fallbackClosedHeight)
+        }
+    }
+
     func testClosedWidthExpandsBeyondWiderDetectedSystemNotch() async {
         await MainActor.run {
             let viewModel = NotchViewModel(

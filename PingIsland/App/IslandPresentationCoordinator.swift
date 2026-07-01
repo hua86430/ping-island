@@ -29,7 +29,8 @@ final class IslandPresentationCoordinator {
             deviceNotchRect: geometry.deviceNotchRect,
             screenRect: geometry.screenRect,
             windowHeight: geometry.windowHeight,
-            hasPhysicalNotch: geometry.hasPhysicalNotch
+            hasPhysicalNotch: geometry.hasPhysicalNotch,
+            menuBarHeight: geometry.menuBarHeight
         )
         applySurfaceMode(AppSettings.surfaceMode, performBootAnimation: false)
     }
@@ -264,6 +265,7 @@ final class IslandPresentationCoordinator {
             screenRect: geometry.screenRect,
             windowHeight: geometry.windowHeight,
             hasPhysicalNotch: geometry.hasPhysicalNotch,
+            menuBarHeight: geometry.menuBarHeight,
             notchModuleWidthProvider: { AppSettings.notchModuleWidth }
         )
     }
@@ -273,6 +275,7 @@ final class IslandPresentationCoordinator {
         let screenRect: CGRect
         let windowHeight: CGFloat
         let hasPhysicalNotch: Bool
+        let menuBarHeight: CGFloat
     }
 
     private static func makeDockedScreenGeometry(for screen: NSScreen) -> DockedScreenGeometry {
@@ -285,11 +288,19 @@ final class IslandPresentationCoordinator {
             height: notchSize.height
         )
 
+        // Real menu bar height on this screen (frame top minus the visible area
+        // top). Used to align the closed bar on non-notch external displays.
+        let detectedMenuBarHeight = screenFrame.maxY - screen.visibleFrame.maxY
+        let menuBarHeight = detectedMenuBarHeight > 0
+            ? detectedMenuBarHeight
+            : NSStatusBar.system.thickness
+
         return DockedScreenGeometry(
             deviceNotchRect: deviceNotchRect,
             screenRect: screenFrame,
             windowHeight: dockedWindowHeight,
-            hasPhysicalNotch: screen.hasPhysicalNotch
+            hasPhysicalNotch: screen.hasPhysicalNotch,
+            menuBarHeight: menuBarHeight
         )
     }
 }

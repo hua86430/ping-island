@@ -94,7 +94,13 @@ class NotchViewModel: ObservableObject {
     }
 
     private var detectedClosedHeight: CGFloat {
-        guard hasPhysicalNotch else { return Self.defaultClosedHeight }
+        guard hasPhysicalNotch else {
+            // Non-notch (external) displays have no camera-housing safe area, so
+            // align the closed bar with the screen's real menu bar height instead
+            // of a hardcoded fallback.
+            let menuBarHeight = ceil(geometry.menuBarHeight)
+            return menuBarHeight > 0 ? menuBarHeight : Self.defaultClosedHeight
+        }
         let systemHeight = ceil(deviceNotchRect.height)
         return systemHeight > 0 ? systemHeight : Self.defaultClosedHeight
     }
@@ -300,6 +306,7 @@ class NotchViewModel: ObservableObject {
         screenRect: CGRect,
         windowHeight: CGFloat,
         hasPhysicalNotch: Bool,
+        menuBarHeight: CGFloat = 0,
         enableEventMonitoring: Bool = true,
         observeSystemEnvironment: Bool = true,
         fullscreenActivityProvider: @escaping @MainActor (CGRect) -> Bool = FullscreenAppDetector.isFullscreenAppActive,
@@ -312,7 +319,8 @@ class NotchViewModel: ObservableObject {
         self.geometry = NotchGeometry(
             deviceNotchRect: deviceNotchRect,
             screenRect: screenRect,
-            windowHeight: windowHeight
+            windowHeight: windowHeight,
+            menuBarHeight: menuBarHeight
         )
         self.hasPhysicalNotch = hasPhysicalNotch
         self.closedWidth = CGFloat(AppSettingsStore.normalizedNotchModuleWidth(notchModuleWidthProvider()))
@@ -342,12 +350,14 @@ class NotchViewModel: ObservableObject {
         deviceNotchRect: CGRect,
         screenRect: CGRect,
         windowHeight: CGFloat,
-        hasPhysicalNotch: Bool
+        hasPhysicalNotch: Bool,
+        menuBarHeight: CGFloat = 0
     ) {
         let updatedGeometry = NotchGeometry(
             deviceNotchRect: deviceNotchRect,
             screenRect: screenRect,
-            windowHeight: windowHeight
+            windowHeight: windowHeight,
+            menuBarHeight: menuBarHeight
         )
         let geometryChanged = updatedGeometry != geometry || hasPhysicalNotch != self.hasPhysicalNotch
         guard geometryChanged else { return }
