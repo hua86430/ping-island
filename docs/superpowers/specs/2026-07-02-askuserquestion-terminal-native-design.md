@@ -77,11 +77,38 @@ parsed `chatItems` and reconstructs a question intervention
 independent of any hook. This is why matcher exclusion alone did not silence the
 Island.
 
-Fix: gate `applyClaudeTranscriptQuestionFallback` on the same toggle. When
-`terminalHandlesAskUserQuestion` is on, it does not reconstruct the card and
-clears any card it previously surfaced. Unlike the hook path, this app-side drop
-is safe: the transcript fallback is a display reconstruction with no blocking
-hook waiting on it.
+Fix (0.24.7): gate `applyClaudeTranscriptQuestionFallback` on the same toggle.
+When `terminalHandlesAskUserQuestion` is on, it dropped the card entirely
+(fully silent). Unlike the hook path, this app-side drop is safe: the transcript
+fallback is a display reconstruction with no blocking hook waiting on it.
+
+### Read-only reminder instead of full silence (0.24.8)
+
+Full silence was too much: the user wants to still see that a session needs a
+decision. Revised behavior when `terminalHandlesAskUserQuestion` is on: the
+transcript fallback STILL surfaces the AskUserQuestion intervention, but marks
+the session `suppressInAppPromptControls = true`, so every card surface renders
+the existing read-only "只提醒，不接管此处响应" notice (no options, no answer
+buttons) instead of the interactive question form, and clicking the card focuses
+the terminal (existing `SessionLauncher.activate`). The terminal still renders
+the native picker. When the question resolves (the pending `askuserquestion`
+tool leaves `running`/`waitingForApproval`), the fallback clears the intervention
+and resets `suppressInAppPromptControls = false`. When the toggle is off, the
+card stays interactive (unchanged).
+
+Contamination guard: `suppressInAppPromptControls` is session-scoped, but
+`shouldSuppressInAppPromptControls` already returns `false` for an approval that
+`canSubmitApprovalFromIsland`, so an answerable approval keeps its buttons even
+if the flag is set; the fallback also resets the flag to `false` whenever no
+transcript question is pending.
+
+All card surfaces must honor `shouldSuppressInAppPromptControls` for a
+`.question` intervention: hover preview, session list, chat, Codex view, and the
+docked notch / detached expanded question card. Any surface that renders the
+interactive question form without the suppress check must be wired to match.
+
+The Settings copy changes from "灵动岛不再显示该提问" to describe the read-only
+reminder ("岛上仍会提醒某个 session 需要回答，点一下跳到终端作答").
 
 ### Components
 
