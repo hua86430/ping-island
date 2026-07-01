@@ -4,6 +4,10 @@
 
 ## 待處理
 
+- [ ] 通知中心模式（notification feed）— 實作完成，待 Task 6 live 實測 + 發版
+  - desc: toggle `notificationFeedMode` 預設關。開時展開島只列未讀 session（`hasUnread` = lastActivity > lastSeenAt，記憶體、重啟清空、不受 30 分自動隱藏）、點列 focus 終端＋標已讀、右上清除全部、收合島顯示未讀數。spec `docs/superpowers/specs/2026-07-02-notification-feed-mode-design.md`；commits 6adec30 de0a83d 7542603 73bb8c8 301bdc6；全 suite 綠、各 task review Approved。
+
+
 - [x] 殭屍卡：AskUserQuestion 提問卡清不掉 — 修好（commit 31f18d3，7 測試 + 全 suite 綠）
   - desc: `SessionStore.isQuestionToolPostToolUse` 要求 PostToolUse 的 `tool_use_id` 對上 intervention 存的 id 才清；當卡片來自無-id channel（Notification / routePromptsToTerminal suppress 路徑）時對不上 → 永不清 → 卡死。修法：PostToolUse 是 AskUserQuestion 且 intervention 沒有可比對 id 時直接清（tool 名相符即可），只有雙方都有 id 才嚴格比對。純邏輯、可單元測試。
 
