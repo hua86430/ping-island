@@ -308,6 +308,7 @@ actor SessionStore {
             ),
             needsClearReconciliation: existing?.needsClearReconciliation ?? false,
             lastActivity: Date(),
+            lastSeenAt: existing?.lastSeenAt ?? Date(),
             createdAt: existing?.createdAt ?? handle.createdAt
         )
 
@@ -2502,6 +2503,23 @@ actor SessionStore {
         }
     }
 
+    func markSessionSeen(sessionId: String) {
+        let resolvedSessionId = resolveCodexSessionAlias(sessionId)
+        guard var session = sessions[resolvedSessionId] else { return }
+        session.lastSeenAt = Date()
+        sessions[resolvedSessionId] = session
+        publishState()
+    }
+
+    func markAllSessionsSeen() {
+        let now = Date()
+        for (id, var session) in sessions {
+            session.lastSeenAt = now
+            sessions[id] = session
+        }
+        publishState()
+    }
+
     private func archiveSession(sessionId: String) async {
         let resolvedSessionId = resolveCodexSessionAlias(sessionId)
         let linkedChildSessionIDs = sessions.values
@@ -4529,6 +4547,7 @@ actor SessionStore {
             conversationInfo: previousSession.conversationInfo,
             needsClearReconciliation: previousSession.needsClearReconciliation,
             lastActivity: previousSession.lastActivity,
+            lastSeenAt: previousSession.lastSeenAt,
             createdAt: previousSession.createdAt
         )
 

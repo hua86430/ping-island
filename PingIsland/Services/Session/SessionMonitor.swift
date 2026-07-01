@@ -803,6 +803,16 @@ class SessionMonitor: ObservableObject {
         }
     }
 
+    /// Mark a single session as seen, clearing its unread state.
+    func markSessionSeen(sessionId: String) {
+        Task { await SessionStore.shared.markSessionSeen(sessionId: sessionId) }
+    }
+
+    /// Mark all sessions as seen, clearing unread state across the board.
+    func markAllSessionsSeen() {
+        Task { await SessionStore.shared.markAllSessionsSeen() }
+    }
+
     // MARK: - State Update
 
     private func updateFromSessions(_ sessions: [SessionState]) {

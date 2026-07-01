@@ -106,6 +106,10 @@ struct SessionState: Equatable, Identifiable, Sendable {
     // MARK: - Timestamps
 
     var lastActivity: Date
+    /// When the user last "saw" this session (notification-feed read marker).
+    /// In-memory only: defaults to creation time, so sessions restored at app
+    /// launch start read and the notification feed starts empty.
+    var lastSeenAt: Date
     var createdAt: Date
 
     // MARK: - Identifiable
@@ -149,6 +153,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         ),
         needsClearReconciliation: Bool = false,
         lastActivity: Date = Date(),
+        lastSeenAt: Date = Date(),
         createdAt: Date = Date()
     ) {
         self.sessionId = sessionId
@@ -182,6 +187,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.conversationInfo = conversationInfo
         self.needsClearReconciliation = needsClearReconciliation
         self.lastActivity = lastActivity
+        self.lastSeenAt = lastSeenAt
         self.createdAt = createdAt
     }
 
@@ -201,6 +207,11 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// even when the prompt response itself must stay in the terminal/client.
     nonisolated var needsPromptNotification: Bool {
         needsApprovalResponse || needsQuestionResponse || suppressInAppPromptControls
+    }
+
+    /// True when the session has activity the user has not seen yet.
+    nonisolated var hasUnread: Bool {
+        lastActivity > lastSeenAt
     }
 
     /// The active permission context, if any
