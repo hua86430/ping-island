@@ -4,8 +4,8 @@
 
 ## 待處理
 
-- [ ] AskUserQuestion 劫持改非阻塞預覽 — brainstorming 進行中
-  - desc: PingIsland 現在把 Claude Code 的 AskUserQuestion 攔成阻塞卡片、在島裡作答並回填終端（`expectsResponse` blocking）。想改成：島只做非阻塞「預覽」（看得到有問題＋選項），問答輸出留在終端原生流程，不劫持。現成參考：`HookPayloadMapper` 的 `routePromptsToTerminal`、QoderWork 的 notify-only 模型。
+- [ ] AskUserQuestion 劫持改非阻塞預覽 — spec 就緒，未實作
+  - desc: 加一個 opt-in 設定 toggle（預設關）。開了 → Claude AskUserQuestion 非阻塞（終端 render 原生 picker），島只顯示唯讀預覽；關了維持現況。spec `docs/superpowers/specs/2026-07-01-askuserquestion-preview-design.md`。
 
 - [ ] cursor-follow：島跨螢幕跟隨游標、消除搬移延遲 — 計畫就緒，未實作
   - desc: automatic 模式下 docked notch 依游標跨螢幕即時移動（reposition 不重建）＋ dwell 0.2s。spec `docs/superpowers/specs/2026-07-01-notch-follow-cursor-design.md`；plan `docs/superpowers/plans/2026-07-01-notch-follow-cursor.md`（commit d85e3fc）。
