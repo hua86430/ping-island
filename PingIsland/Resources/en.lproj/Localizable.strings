@@ -637,3 +637,6 @@
 "低" = "Low";
 "高" = "High";
 "%@ · %@ 条活跃记录" = "%@ · %@ active records";
+"新通知" = "Notifications";
+"清除全部" = "Clear All";
+"没有新通知" = "No new notifications";

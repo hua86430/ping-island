@@ -40,12 +40,19 @@ struct IslandOpenedContentView: View {
     private var routeContent: some View {
         switch route {
         case .sessionList:
-            SessionListView(
-                sessionMonitor: sessionMonitor,
-                viewModel: viewModel,
-                enableKeyboardNavigation: surface == .docked,
-                highlightedSessionStableID: highlightedSessionStableID
-            )
+            if settings.notificationFeedMode {
+                NotificationFeedView(
+                    sessionMonitor: sessionMonitor,
+                    viewModel: viewModel
+                )
+            } else {
+                SessionListView(
+                    sessionMonitor: sessionMonitor,
+                    viewModel: viewModel,
+                    enableKeyboardNavigation: surface == .docked,
+                    highlightedSessionStableID: highlightedSessionStableID
+                )
+            }
         case .hoverDashboard:
             SessionHoverDashboardView(
                 sessions: hoverPreviewSessions,

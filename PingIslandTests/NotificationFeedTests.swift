@@ -65,4 +65,22 @@ final class NotificationFeedTests: XCTestCase {
         store.notificationFeedMode = false
         XCTAssertFalse(suite.bool(forKey: key))
     }
+
+    func testFeedSessionsOnlyUnreadNewestFirst() {
+        let base = Date(timeIntervalSince1970: 1_000_000)
+        let unreadOld = makeSession(id: "old", lastActivity: base.addingTimeInterval(10), lastSeenAt: base)
+        let unreadNew = makeSession(id: "new", lastActivity: base.addingTimeInterval(100), lastSeenAt: base)
+        let read = makeSession(id: "read", lastActivity: base, lastSeenAt: base.addingTimeInterval(1))
+
+        let feed = NotificationFeedView.feedSessions(from: [read, unreadOld, unreadNew])
+        XCTAssertEqual(feed.map(\.sessionId), ["new", "old"])
+    }
+
+    func testFeedIncludesUnreadOlderThanThirtyMinutes() {
+        // Unread exempt from the 30-minute idle hide: an unread session whose
+        // lastActivity is 45 minutes old must still be in the feed.
+        let old = Date(timeIntervalSinceNow: -45 * 60)
+        let stale = makeSession(id: "stale", lastActivity: old, lastSeenAt: old.addingTimeInterval(-1))
+        XCTAssertEqual(NotificationFeedView.feedSessions(from: [stale]).map(\.sessionId), ["stale"])
+    }
 }
