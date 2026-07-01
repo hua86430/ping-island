@@ -10,8 +10,8 @@
 - [ ] cursor-follow：島跨螢幕跟隨游標、消除搬移延遲 — 計畫就緒，未實作
   - desc: automatic 模式下 docked notch 依游標跨螢幕即時移動（reposition 不重建）＋ dwell 0.2s。spec `docs/superpowers/specs/2026-07-01-notch-follow-cursor-design.md`；plan `docs/superpowers/plans/2026-07-01-notch-follow-cursor.md`（commit d85e3fc）。
 
-- [ ] Ctrl-C 退出的 session 殘留通知欄 — 已查根因，未 brainstorming／未修
-  - desc: local hook session 的 `pid` 恆為 nil，`pruneOrphanedSessions` / `sweepDeadOrEndedSessions` 遇 nil pid 都跳過；Ctrl-C 沒送 clean Stop → session 卡 `.idle` 永不 `.ended` → 通知欄殘留。修法方向：用 tty 判該終端是否還有活著的 `claude`。
+- [ ] Ctrl-C 退出的 session 殘留通知欄 — spec 就緒，未實作
+  - desc: local Claude hook session `pid` 恆為 nil → 存活檢查跳過 → Ctrl-C 後卡 `.idle` 永不 `.ended`。修法：liveness sweep 對「本機 Claude、有 tty、無 pid」的 session 用 `ProcessTreeBuilder` 查該 tty 上是否還有 `claude`，有就補 pid、沒有就判 `.ended` 移除；remote/tmux-unresolvable 排除。spec `docs/superpowers/specs/2026-07-01-ctrlc-session-liveness-design.md`。
 
 ## 已完成
 
