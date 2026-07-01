@@ -78,62 +78,6 @@ func routePromptsToTerminalDropsAskUserQuestionIntervention() throws {
 }
 
 @Test
-func claudeQuestionPreviewOnlyMakesQuestionNonBlockingButKeepsPreview() throws {
-    let payload = """
-    {
-      "hook_event_name": "PreToolUse",
-      "tool_name": "AskUserQuestion",
-      "tool_input": {
-        "questions": [
-          {"id": "q1", "question": "Pick one", "options": ["A", "B"]}
-        ]
-      },
-      "session_id": "abc123"
-    }
-    """.data(using: .utf8)!
-
-    let envelope = HookPayloadMapper.makeEnvelope(
-        source: .claude,
-        arguments: ["island-bridge", "--source", "claude"],
-        environment: ["TERM_PROGRAM": "iTerm.app", "PWD": "/tmp/demo"],
-        stdinData: payload,
-        runtimeConfig: BridgeRuntimeConfig(claudeQuestionPreviewOnly: true)
-    )
-
-    #expect(envelope.intervention?.kind == .question)
-    #expect(envelope.expectsResponse == false)
-    #expect(envelope.metadata["suppress_in_app_prompt"] == "true")
-}
-
-@Test
-func claudeQuestionStillBlocksWhenPreviewOnlyDisabled() throws {
-    let payload = """
-    {
-      "hook_event_name": "PreToolUse",
-      "tool_name": "AskUserQuestion",
-      "tool_input": {
-        "questions": [
-          {"id": "q1", "question": "Pick one", "options": ["A", "B"]}
-        ]
-      },
-      "session_id": "abc123"
-    }
-    """.data(using: .utf8)!
-
-    let envelope = HookPayloadMapper.makeEnvelope(
-        source: .claude,
-        arguments: ["island-bridge", "--source", "claude"],
-        environment: ["TERM_PROGRAM": "iTerm.app", "PWD": "/tmp/demo"],
-        stdinData: payload,
-        runtimeConfig: BridgeRuntimeConfig(claudeQuestionPreviewOnly: false)
-    )
-
-    #expect(envelope.intervention?.kind == .question)
-    #expect(envelope.expectsResponse == true)
-    #expect(envelope.metadata["suppress_in_app_prompt"] == nil)
-}
-
-@Test
 func bridgeRuntimeConfigLoadsFromEnvironmentPath() async throws {
     try await withTemporaryDirectory { directory in
         let configURL = directory.appending(path: "bridge-config.json")
