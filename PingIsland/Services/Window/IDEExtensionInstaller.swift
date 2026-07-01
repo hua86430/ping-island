@@ -6,9 +6,9 @@ struct IDEExtensionInstaller {
     nonisolated private static let extensionName = "session-focus"
     nonisolated private static let extensionIconFilename = "icon.png"
     nonisolated private static let extensionReadmeFilename = "README.md"
-    nonisolated private static let projectHomepage = "https://github.com/erha19/ping-island"
-    nonisolated private static let projectRepository = "https://github.com/erha19/ping-island.git"
-    nonisolated private static let projectIssues = "https://github.com/erha19/ping-island/issues"
+    nonisolated private static let projectHomepage = "https://github.com/hua86430/ping-island"
+    nonisolated private static let projectRepository = "https://github.com/hua86430/ping-island.git"
+    nonisolated private static let projectIssues = "https://github.com/hua86430/ping-island/issues"
 
     nonisolated private static var extensionVersion: String {
         applicationVersion()

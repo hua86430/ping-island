@@ -739,7 +739,7 @@ final class RemoteConnectorManager: ObservableObject {
                 SCP 传输失败，请在远程主机上手动安装 PingIslandBridge：
                 
                   mkdir -p \(endpoint.remoteInstallRoot)/bin
-                  curl -L -o /tmp/bridge.zip https://github.com/erha19/ping-island/releases/latest/download/PingIslandBridge-linux-musl-\(arch).zip
+                  curl -L -o /tmp/bridge.zip https://github.com/hua86430/ping-island/releases/latest/download/PingIslandBridge-linux-musl-\(arch).zip
                   unzip -o /tmp/bridge.zip -d \(endpoint.remoteInstallRoot)/bin/
                   chmod 755 \(endpoint.remoteInstallRoot)/bin/PingIslandBridge
                 
@@ -2359,7 +2359,7 @@ private final class RemoteBridgeAssetResolver {
         var downloadFailures: [String] = []
         for candidate in assetCandidates {
             let cachedArchiveURL = cacheDirectory.appendingPathComponent(candidate.archive)
-            let releaseURLString = "https://github.com/erha19/ping-island/releases/download/v\(version)/\(candidate.archive)"
+            let releaseURLString = "https://github.com/hua86430/ping-island/releases/download/v\(version)/\(candidate.archive)"
             guard let releaseURL = URL(string: releaseURLString) else {
                 downloadFailures.append(AppLocalization.format("下载地址无效：%@", releaseURLString))
                 continue

@@ -9,9 +9,9 @@ struct IDEExtensionInstaller {
     static let extensionIdentifier = "ping-island.session-focus"
     private static let extensionIconFilename = "icon.png"
     private static let extensionReadmeFilename = "README.md"
-    private static let projectHomepage = "https://github.com/erha19/ping-island"
-    private static let projectRepository = "https://github.com/erha19/ping-island.git"
-    private static let projectIssues = "https://github.com/erha19/ping-island/issues"
+    private static let projectHomepage = "https://github.com/hua86430/ping-island"
+    private static let projectRepository = "https://github.com/hua86430/ping-island.git"
+    private static let projectIssues = "https://github.com/hua86430/ping-island/issues"
 
     static var extensionVersion: String {
         applicationVersion()

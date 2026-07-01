@@ -3515,7 +3515,7 @@ private struct SettingsPanelContentView: View {
 
             SettingsSectionCard(title: "链接") {
                 SettingsActionLine(title: "GitHub", subtitle: "打开 Issues 页面反馈问题") {
-                    if let url = URL(string: "https://github.com/erha19/ping-island/issues") {
+                    if let url = URL(string: "https://github.com/hua86430/ping-island/issues") {
                         NSWorkspace.shared.open(url)
                     }
                 } accessory: {
