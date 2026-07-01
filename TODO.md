@@ -7,7 +7,7 @@
 - [x] 殭屍卡：AskUserQuestion 提問卡清不掉 — 修好（commit 31f18d3，7 測試 + 全 suite 綠）
   - desc: `SessionStore.isQuestionToolPostToolUse` 要求 PostToolUse 的 `tool_use_id` 對上 intervention 存的 id 才清；當卡片來自無-id channel（Notification / routePromptsToTerminal suppress 路徑）時對不上 → 永不清 → 卡死。修法：PostToolUse 是 AskUserQuestion 且 intervention 沒有可比對 id 時直接清（tool 名相符即可），只有雙方都有 id 才嚴格比對。純邏輯、可單元測試。
 
-- [x] AskUserQuestion 終端原生 picker（full exclusion）— 完工，待手動 UI 驗 + 發版（commits 4109117 dc25265 f3d9b6a 70eb2dc；全 suite 綠、各 task review + final whole-branch review 全過）
+- [x] AskUserQuestion 終端原生 picker（full exclusion）— 0.24.6 發版後實測發現島仍跳卡；根因是第二條 surfacing 路徑 `SessionStore.applyClaudeTranscriptQuestionFallback`（transcript 重建，非 hook），0.24.7 補上 toggle gate（commit 見下）。待你 update 0.24.7 實測。
   - desc: 前提修正：log 證實真正阻塞閘門是 PreToolUse（`expectsResponse=true`）非 PermissionRequest；Notification 0 筆帶題目；非阻塞 hook → Claude dismiss（A 已 revert c35acc4、14b84e3）。hook 模型下「終端 picker + 島通知」不可兼得。定案 full exclusion：Settings toggle `terminalHandlesAskUserQuestion` 預設關；開時 `HookInstaller.effectiveEvents`(821) 把 Claude 的 PreToolUse + PermissionRequest matcher 從 `"*"` 改成排除 AskUserQuestion/AskFollowupQuestion 的 regex，didSet 觸發 reinstall；開著時島對問題靜默（取捨，非 bug）。spec `docs/superpowers/specs/2026-07-02-askuserquestion-terminal-native-design.md`。fail-fast：Task 1 實測 regex matcher 是否被 Claude 接受 + 排除後 Pre 真的不觸發。
 
 - [ ] cursor-follow：島跨螢幕跟隨游標、消除搬移延遲 — 計畫就緒，未實作
