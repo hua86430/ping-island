@@ -76,16 +76,23 @@ final class AskUserQuestionExclusionTests: XCTestCase {
 
     @MainActor
     func testSettingDefaultsToFalseAndPersists() {
+        // Use an isolated defaults suite + a fresh store so the test does not
+        // depend on the shared singleton's bootstrap value (which mirrors the
+        // developer's real ~/Library defaults where the toggle may be on).
         let key = AppSettingsDefaultKeys.terminalHandlesAskUserQuestion
-        let had = UserDefaults.standard.object(forKey: key) != nil
-        let prev = UserDefaults.standard.bool(forKey: key)
-        UserDefaults.standard.removeObject(forKey: key)
-        defer { had ? UserDefaults.standard.set(prev, forKey: key) : UserDefaults.standard.removeObject(forKey: key) }
+        let suiteName = "test-\(key)-\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        defer { suite.removePersistentDomain(forName: suiteName) }
 
-        // Property exists and mirrors the persisted default (false when unset).
-        XCTAssertFalse(AppSettingsStore.shared.terminalHandlesAskUserQuestion)
-        AppSettingsStore.shared.terminalHandlesAskUserQuestion = true
-        XCTAssertTrue(UserDefaults.standard.bool(forKey: key))
-        AppSettingsStore.shared.terminalHandlesAskUserQuestion = false
+        let store = AppSettingsStore(defaults: suite, bridgeRuntimeConfigWriter: { _ in })
+
+        // Default is false when the key is absent.
+        XCTAssertFalse(store.terminalHandlesAskUserQuestion)
+
+        // Persists both directions to the backing store.
+        store.terminalHandlesAskUserQuestion = true
+        XCTAssertTrue(suite.bool(forKey: key))
+        store.terminalHandlesAskUserQuestion = false
+        XCTAssertFalse(suite.bool(forKey: key))
     }
 }
