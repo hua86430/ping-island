@@ -1234,6 +1234,27 @@ struct SessionState: Equatable, Identifiable, Sendable {
         ].compactMap { $0 })
     }
 
+    /// Stable identifier for the terminal surface this session runs in. Used to
+    /// keep two concurrent Claude sessions in the same cwd but different
+    /// terminals from collapsing into one row, while still collapsing a relaunch
+    /// in the same terminal. Returns nil when no terminal identity is available;
+    /// callers fall back to sessionId.
+    nonisolated var terminalDedupIdentity: String? {
+        func normalized(_ value: String?) -> String? {
+            let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard let trimmed, !trimmed.isEmpty else { return nil }
+            return trimmed.lowercased()
+        }
+        if let pane = normalized(clientInfo.tmuxPaneIdentifier) { return "pane:\(pane)" }
+        if let iterm = normalized(clientInfo.iTermSessionIdentifier) { return "iterm:\(iterm)" }
+        if let term = normalized(clientInfo.terminalSessionIdentifier) { return "term:\(term)" }
+        if let tty = normalized(tty) {
+            if let host = normalized(clientInfo.remoteHost) { return "tty:\(host):\(tty)" }
+            return "tty:\(tty)"
+        }
+        return nil
+    }
+
     private nonisolated var hookSurfaceIdentityTokens: Set<String> {
         func normalized(_ value: String?) -> String? {
             let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines)
