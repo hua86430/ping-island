@@ -141,8 +141,22 @@ This file is a routing layer for coding agents working in this repo. Keep it sho
   - `./scripts/package-unsigned.sh`
   - `./scripts/create-release.sh`
   - `./scripts/generate-keys.sh`
-  - GitHub Actions: `.github/workflows/release-packages.yml` imports a Developer ID certificate from repository secrets, notarizes the exported app, publishes signed `dmg` / `zip` assets plus a zipped Linux `PingIslandBridge` remote-agent payload to the matching GitHub Release for a `v*` tag or manual dispatch, and should treat the DMG as the primary manual-install artifact
+  - GitHub Actions `.github/workflows/release-unsigned.yml` is the active tag-push release path for this fork: on a `v*` tag it builds an ad-hoc (unsigned) `dmg` / `zip`, generates an EdDSA-signed `appcast.xml`, and publishes them to the matching GitHub Release. It needs the `SPARKLE_APPCAST_URL` / `SPARKLE_PUBLIC_ED_KEY` / `SPARKLE_PRIVATE_ED_KEY` repository secrets.
+  - GitHub Actions `.github/workflows/release-packages.yml` is the signed Developer ID + notarized path (also builds the Linux `PingIslandBridge` payload). It is `workflow_dispatch`-only until the Apple Developer ID / notary secrets are configured, so it does not fire on tag pushes.
 - Release scripts assume local signing and notarization tooling. They may modify `build/`, `releases/`, and `.sparkle-keys/`.
+
+## Release Runbook
+
+When the user asks to cut a release, follow this (unsigned CI path, no Apple Developer ID required):
+
+1. Confirm the target version with the user (default: patch bump). Bump both `MARKETING_VERSION` and `CURRENT_PROJECT_VERSION` for every app target in `PingIsland.xcodeproj/project.pbxproj` (leave the Sparkle helper tools' `CURRENT_PROJECT_VERSION = 5`). Sparkle needs a monotonically increasing build number.
+2. Write bilingual release notes at `releases/notes/<version>.md` using `<!-- zh-Hant -->` and `<!-- en -->` markers (the in-app updater and `UpdateReleaseNotesParser` read these).
+3. Merge the feature work to `main`, commit the version bump + notes.
+4. `git tag v<version>` (the tag must equal `v` + the app version, or CI fails the version check) and `git push origin main --tags`.
+5. `release-unsigned.yml` auto-runs: builds the unsigned `dmg` / `zip`, signs the appcast with the `SPARKLE_PRIVATE_ED_KEY` secret, and publishes the GitHub Release (published, non-draft, so `releases/latest/download/appcast.xml` resolves). Watch it with `gh run watch`.
+6. The Sparkle EdDSA private key also lives at `.sparkle-keys/eddsa_private_key` (git-ignored). Back it up. Losing it breaks auto-update for every already-installed build that trusts the matching public key.
+
+Unsigned builds trip Gatekeeper on first manual install (right-click Open, or `xattr -dr com.apple.quarantine`). Sparkle auto-update still works via the EdDSA signature. To move to the signed/notarized experience, add the Apple Developer ID + notary secrets and re-enable the `v*` tag trigger on `release-packages.yml`.
 
 ## Working Rules
 
