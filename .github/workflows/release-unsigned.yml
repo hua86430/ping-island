@@ -1,0 +1,200 @@
+name: Release (unsigned)
+
+# Free release path for forks without an Apple Developer ID.
+# Builds an ad-hoc-signed (unsigned) DMG/ZIP and a Sparkle EdDSA-signed appcast,
+# then publishes them to the matching GitHub Release. Auto-update works via the
+# EdDSA signature; the first install still needs a manual Gatekeeper bypass.
+#
+# Required repository secrets:
+#   SPARKLE_APPCAST_URL     full appcast URL, e.g. https://github.com/OWNER/REPO/releases/latest/download/appcast.xml
+#   SPARKLE_PUBLIC_ED_KEY   Sparkle EdDSA public key (baked into the app)
+#   SPARKLE_PRIVATE_ED_KEY  Sparkle EdDSA private key file contents (signs the appcast)
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing git tag to package into a GitHub Release, e.g. v0.24.4
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-unsigned-${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build unsigned packages
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+
+    steps:
+      - name: Checkout tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Validate Sparkle secrets
+        env:
+          SPARKLE_APPCAST_URL: ${{ secrets.SPARKLE_APPCAST_URL }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in SPARKLE_APPCAST_URL SPARKLE_PUBLIC_ED_KEY SPARKLE_PRIVATE_ED_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "::error::Missing required repository secret: $name"
+              exit 1
+            fi
+          done
+
+      - name: Inject Sparkle config
+        shell: bash
+        env:
+          SPARKLE_APPCAST_URL: ${{ secrets.SPARKLE_APPCAST_URL }}
+          SPARKLE_PUBLIC_ED_KEY: ${{ secrets.SPARKLE_PUBLIC_ED_KEY }}
+        run: |
+          set -euo pipefail
+          # xcconfig treats `//` as a comment, so split the URL around the scheme
+          # slashes and rebuild it via the _XC_SLASH helper (same trick the signed
+          # workflow uses).
+          printf '_XC_SLASH = /\nSPARKLE_APPCAST_URL = %s$(_XC_SLASH)/%s\nSPARKLE_PUBLIC_ED_KEY = %s\n' \
+            "${SPARKLE_APPCAST_URL%%//*}" \
+            "${SPARKLE_APPCAST_URL#*//}" \
+            "$SPARKLE_PUBLIC_ED_KEY" \
+            > Config/LocalSecrets.xcconfig
+          echo "Wrote Config/LocalSecrets.xcconfig"
+
+      - name: Write Sparkle private key
+        id: sparkle_private_key
+        shell: bash
+        env:
+          SPARKLE_PRIVATE_ED_KEY: ${{ secrets.SPARKLE_PRIVATE_ED_KEY }}
+        run: |
+          set -euo pipefail
+          key_path="$RUNNER_TEMP/sparkle_private_ed_key"
+          printf '%s' "$SPARKLE_PRIVATE_ED_KEY" > "$key_path"
+          chmod 600 "$key_path"
+          echo "path=$key_path" >> "$GITHUB_OUTPUT"
+
+      - name: Build unsigned DMG and ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/package-unsigned.sh
+
+      - name: Verify version, generate signed appcast
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+
+          dmg_assets=(releases/unsigned/*.dmg)
+          zip_assets=(releases/unsigned/*.zip)
+          if [ "${#dmg_assets[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one DMG in releases/unsigned, found ${#dmg_assets[@]}"
+            exit 1
+          fi
+          if [ "${#zip_assets[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one ZIP in releases/unsigned, found ${#zip_assets[@]}"
+            exit 1
+          fi
+          dmg_path="${dmg_assets[0]}"
+          zip_path="${zip_assets[0]}"
+
+          app_path="build/unsigned/DerivedData/Build/Products/Release/Ping Island.app"
+          if [ ! -d "$app_path" ]; then
+            echo "::error::Built app not found at $app_path"
+            exit 1
+          fi
+          version=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$app_path/Contents/Info.plist")
+          expected_tag="v$version"
+          if [ "$RELEASE_TAG" != "$expected_tag" ]; then
+            echo "::error::Release tag $RELEASE_TAG does not match app version $version (expected $expected_tag)"
+            exit 1
+          fi
+
+          appcast_dir="releases/unsigned/appcast"
+          mkdir -p "$appcast_dir"
+          cp "$dmg_path" "$appcast_dir/"
+          notes_src="releases/notes/$version.md"
+          notes_asset=
+          if [ -f "$notes_src" ]; then
+            notes_asset="$appcast_dir/PingIsland-$version.md"
+            cp "$notes_src" "$notes_asset"
+          fi
+
+          gen=$(find "$HOME/Library/Developer/Xcode/DerivedData" "$GITHUB_WORKSPACE/build" \
+                 -type f -name generate_appcast -path '*sparkle*bin*' 2>/dev/null | head -1)
+          if [ -z "$gen" ]; then
+            echo "::error::generate_appcast tool not found in DerivedData"
+            exit 1
+          fi
+          echo "Using generate_appcast: $gen"
+          "$gen" --ed-key-file "${{ steps.sparkle_private_key.outputs.path }}" "$appcast_dir"
+
+          {
+            echo "version=$version"
+            echo "dmg_path=$dmg_path"
+            echo "zip_path=$zip_path"
+            echo "appcast_path=$appcast_dir/appcast.xml"
+            echo "notes_src=$notes_src"
+            echo "notes_asset=$notes_asset"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create or update GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+
+          body="$RUNNER_TEMP/release-body.md"
+          if [ -f "${{ steps.meta.outputs.notes_src }}" ]; then
+            cp "${{ steps.meta.outputs.notes_src }}" "$body"
+          else
+            printf 'Release %s\n' "$RELEASE_TAG" > "$body"
+          fi
+          {
+            printf '\n\n## Install\n'
+            printf 'Unsigned build (no Apple Developer ID). On first launch macOS Gatekeeper blocks it:\n'
+            printf -- '- Right-click the app -> Open -> Open, or\n'
+            printf -- '- `xattr -dr com.apple.quarantine "/Applications/Ping Island.app"`\n\n'
+            printf 'Built on GitHub Actions. Sparkle auto-update is EdDSA-signed.\n'
+          } >> "$body"
+
+          gh release view "$RELEASE_TAG" --repo "$repo" >/dev/null 2>&1 || \
+            gh release create "$RELEASE_TAG" --repo "$repo" --verify-tag \
+              --title "Ping Island $RELEASE_TAG" --notes-file "$body"
+
+          assets=(
+            "${{ steps.meta.outputs.dmg_path }}"
+            "${{ steps.meta.outputs.zip_path }}"
+            "${{ steps.meta.outputs.appcast_path }}"
+          )
+          if [ -n "${{ steps.meta.outputs.notes_asset }}" ]; then
+            assets+=("${{ steps.meta.outputs.notes_asset }}")
+          fi
+
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --repo "$repo" --clobber
+          gh release edit "$RELEASE_TAG" --repo "$repo" \
+            --title "Ping Island $RELEASE_TAG" --notes-file "$body" \
+            --draft=false --prerelease=false
+          gh release view "$RELEASE_TAG" --repo "$repo"
+
+      - name: Cleanup
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          rm -f Config/LocalSecrets.xcconfig "$RUNNER_TEMP/sparkle_private_ed_key"

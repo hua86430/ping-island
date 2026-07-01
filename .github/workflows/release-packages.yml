@@ -1,9 +1,8 @@
 name: Release Packages
 
 on:
-  push:
-    tags:
-      - "v*"
+  # Tag-push auto-release is handled by release-unsigned.yml on this fork.
+  # This signed path stays manual until Apple Developer ID secrets are configured.
   workflow_dispatch:
     inputs:
       tag:
