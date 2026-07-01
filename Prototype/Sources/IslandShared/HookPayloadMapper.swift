@@ -46,6 +46,14 @@ public enum HookPayloadMapper {
             payload: payload,
             clientKind: clientKind
         )
+        let isClaudePreviewQuestion = runtimeConfig.claudeQuestionPreviewOnly
+            && source == .claude
+            && detectedIntervention?.kind == .question
+        if isClaudePreviewQuestion {
+            // Non-blocking preview: keep the intervention for a read-only Island
+            // card, but let Claude Code render its native picker in the terminal.
+            metadata["suppress_in_app_prompt"] = "true"
+        }
         // When the user has opted to keep prompts in the terminal, drop the
         // intervention before status/expectsResponse are computed so the bridge
         // does not block and the app does not surface a prompt UI.
@@ -58,14 +66,17 @@ public enum HookPayloadMapper {
             clientKind: clientKind,
             intervention: intervention
         )
-        let expectsResponse = runtimeConfig.routePromptsToTerminal
-            ? false
-            : detectExpectsResponse(
+        let expectsResponse: Bool
+        if runtimeConfig.routePromptsToTerminal || isClaudePreviewQuestion {
+            expectsResponse = false
+        } else {
+            expectsResponse = detectExpectsResponse(
                 eventType: eventType,
                 payload: payload,
                 clientKind: clientKind,
                 intervention: intervention
             )
+        }
 
         return BridgeEnvelope(
             provider: source,
