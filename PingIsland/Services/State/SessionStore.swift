@@ -4001,19 +4001,12 @@ actor SessionStore {
 
         let fallbackSource = "claudeTranscriptQuestion"
 
-        // When the user routes AskUserQuestion to the terminal, do not
-        // reconstruct a question card from the transcript. The terminal renders
-        // Claude's native picker and the Island stays silent for the question;
-        // clear any card this fallback already surfaced.
-        if UserDefaults.standard.bool(forKey: AppSettingsDefaultKeys.terminalHandlesAskUserQuestion) {
-            if session.intervention?.metadata["source"] == fallbackSource {
-                session.intervention = nil
-                if session.phase == .waitingForInput {
-                    session.phase = .processing
-                }
-            }
-            return
-        }
+        // When the user routes AskUserQuestion to the terminal, still surface the
+        // transcript-reconstructed question but mark the session so every card
+        // renders a read-only reminder (no answer controls) and a tap focuses the
+        // terminal. The terminal renders Claude's native picker; the user answers
+        // there. When the toggle is off, the card stays interactive.
+        let terminalRouted = UserDefaults.standard.bool(forKey: AppSettingsDefaultKeys.terminalHandlesAskUserQuestion)
 
         let currentSource = session.intervention?.metadata["source"]
         if let currentSource, currentSource != fallbackSource {
@@ -4032,6 +4025,7 @@ actor SessionStore {
         }).first else {
             if currentSource == fallbackSource {
                 session.intervention = nil
+                session.suppressInAppPromptControls = false
                 if session.phase == .waitingForInput {
                     session.phase = .processing
                 }
@@ -4048,6 +4042,7 @@ actor SessionStore {
         }
 
         session.intervention = intervention
+        session.suppressInAppPromptControls = terminalRouted
         session.phase = .waitingForInput
         session.lastActivity = Date()
     }
