@@ -2330,7 +2330,7 @@ actor SessionStore {
         return newPhase != .waitingForInput
     }
 
-    private func isQuestionToolPostToolUse(
+    nonisolated func isQuestionToolPostToolUse(
         _ event: HookEvent,
         matching intervention: SessionIntervention?
     ) -> Bool {
@@ -2345,7 +2345,13 @@ actor SessionStore {
         guard let toolUseId = event.toolUseId else {
             return true
         }
-        return intervention?.matchesResolvedToolUseId(toolUseId) == true
+        if intervention?.matchesResolvedToolUseId(toolUseId) == true {
+            return true
+        }
+        // The intervention carries no tool_use_id to disambiguate against (e.g.
+        // a Notification-origin question); a completed AskUserQuestion means this
+        // question is done, so clear it instead of leaving a stuck card.
+        return intervention?.hasResolvableToolUseId == false
     }
 
     private func shouldPreserveQwenQuestionIntervention(

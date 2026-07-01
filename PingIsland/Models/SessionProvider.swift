@@ -1108,6 +1108,14 @@ struct SessionIntervention: Equatable, Identifiable, Sendable {
             || metadata["tool_use_id"] == toolUseId
     }
 
+    /// True when the intervention carries a real tool-use-id we can match a
+    /// PostToolUse against. Notification-origin (and suppress-path) questions
+    /// have none, so a matching-tool PostToolUse cannot be id-correlated to them.
+    nonisolated var hasResolvableToolUseId: Bool {
+        [metadata["originalToolUseId"], metadata["toolUseId"], metadata["tool_use_id"]]
+            .contains { ($0?.isEmpty == false) }
+    }
+
     nonisolated func markingAwaitingExternalContinuation(
         actorName: String,
         answeredAt: Date = Date(),
