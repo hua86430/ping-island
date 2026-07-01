@@ -369,7 +369,10 @@ struct HoverSessionCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(RoundedRectangle(cornerRadius: density == .detachedCompact ? 18 : 20, style: .continuous))
         .onTapGesture {
-            guard opensOnTap else { return }
+            // Attention / dashboard cards pass opensOnTap: false because they
+            // normally carry answer buttons. The terminal-routed reminder has no
+            // buttons, so tapping it must focus the terminal instead.
+            guard opensOnTap || session.intervention?.isTerminalRoutedReminder == true else { return }
             activateSession()
         }
         .onHover { isHovered = $0 }

@@ -685,7 +685,11 @@ actor TerminalSessionFocuser {
         bundleIdentifier: String = "com.mitchellh.ghostty"
     ) -> [String] {
         var lines = [
-            "tell application id \(appleScriptStringLiteral(bundleIdentifier))"
+            "tell application id \(appleScriptStringLiteral(bundleIdentifier))",
+            // Raise Ghostty to the front. `focus <terminal>` only selects the
+            // surface within the app; without activate the window stays behind
+            // whatever is frontmost, so the click appears to do nothing.
+            "activate"
         ]
 
         if let terminalSessionIdentifier = normalizedGhosttyTerminalIdentifier(terminalSessionIdentifier) {
