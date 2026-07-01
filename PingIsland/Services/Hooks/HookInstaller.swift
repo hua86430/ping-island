@@ -818,9 +818,40 @@ struct HookInstaller {
         UserDefaults.standard.set(stored, forKey: eventSelectionsDefaultsKey)
     }
 
+    /// Matches every tool name except AskUserQuestion / AskFollowupQuestion.
+    /// Used to exclude Claude's question tools from the intervention-producing
+    /// hooks so Claude renders its native terminal picker instead.
+    static let askUserQuestionExclusionMatcher = "^(?!(?:AskUserQuestion|AskFollowupQuestion)$).+$"
+
+    /// When enabled for the Claude Code profile, rewrites the PreToolUse and
+    /// PermissionRequest tool matchers to exclude the question tools. Other
+    /// events, other profiles, and the disabled case are returned untouched.
+    static func applyingAskUserQuestionTerminalExclusion(
+        to events: [HookInstallEventDescriptor],
+        enabled: Bool,
+        profileID: String
+    ) -> [HookInstallEventDescriptor] {
+        guard enabled, profileID == "claude-hooks" else { return events }
+        let rewritten: Set<String> = ["PreToolUse", "PermissionRequest"]
+        return events.map { event in
+            guard rewritten.contains(event.name) else { return event }
+            let templates = event.templates.map { template -> HookInstallEntryTemplate in
+                if case .matcher = template { return .matcher(askUserQuestionExclusionMatcher) }
+                return template
+            }
+            return HookInstallEventDescriptor(name: event.name, templates: templates, timeout: event.timeout)
+        }
+    }
+
     private static func effectiveEvents(for profile: ManagedHookClientProfile) -> [HookInstallEventDescriptor] {
-        guard profile.supportsEventSelection else { return profile.events }
-        return loadSelection(for: profile).filteredEvents(for: profile)
+        let base = profile.supportsEventSelection
+            ? loadSelection(for: profile).filteredEvents(for: profile)
+            : profile.events
+        return applyingAskUserQuestionTerminalExclusion(
+            to: base,
+            enabled: UserDefaults.standard.bool(forKey: AppSettingsDefaultKeys.terminalHandlesAskUserQuestion),
+            profileID: profile.id
+        )
     }
 
     static func createTemporarySettingsFile(for profileID: String) -> URL? {

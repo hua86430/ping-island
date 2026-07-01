@@ -20,6 +20,7 @@ enum AppSettingsDefaultKeys {
     nonisolated static let hookInstallOnboardingPending = "hookInstallOnboardingPending"
     nonisolated static let analyticsEnabled = TelemetryConsent.analyticsEnabledKey
     nonisolated static let analyticsConsentPromptCompleted = "analyticsConsentPromptCompleted"
+    static let terminalHandlesAskUserQuestion = "terminalHandlesAskUserQuestion"
 }
 
 enum AppLanguage: String, CaseIterable, Identifiable {
