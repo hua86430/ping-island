@@ -3161,6 +3161,13 @@ private struct SettingsPanelContentView: View {
                 SettingsLineDivider()
 
                 SettingsToggleLine(
+                    title: "让终端处理 Claude 的提问",
+                    subtitle: "开启后 Claude 的 AskUserQuestion 改由终端原生菜单处理，灵动岛不再显示该提问；下一个 Claude session 生效。",
+                    isOn: $settings.terminalHandlesAskUserQuestion
+                )
+                SettingsLineDivider()
+
+                SettingsToggleLine(
                     title: "空闲时自动保留到终端",
                     subtitle: "键盘和鼠标静默达到设定时长后临时开启上方策略；恢复活跃后回到手动设置。",
                     isOn: $settings.autoRoutePromptsToTerminalWhenIdleEnabled
@@ -3412,6 +3419,12 @@ private struct SettingsPanelContentView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel(Text(appLocalized: "一键卸载所有 Hooks 配置文件"))
+        }
+        .onChange(of: settings.terminalHandlesAskUserQuestion) { _, _ in
+            if let profile = ClientProfileRegistry.managedHookProfile(id: "claude-hooks"),
+               HookInstaller.isInstalled(profile) {
+                viewModel.reinstallHooks(for: profile)
+            }
         }
     }
 
