@@ -53,11 +53,35 @@ excludes AskUserQuestion (and AskFollowupQuestion) from the tool-matched events
 that produce the intervention, so no bridge envelope is ever generated for
 those tools and Claude falls back to its native prompt.
 
-All changes live at the hook-install layer. No UI card work, no `SessionStore`
-change, and deliberately **no app-side intervention drop** — dropping an
-intervention while a pre-toggle session's blocking PreToolUse is still waiting
-would leave Claude hung on that hook with neither surface answering. Excluding
-at the matcher is the clean cut: the hook simply never runs.
+The hook path is handled purely at the hook-install layer, with deliberately
+**no app-side drop of the hook-origin intervention** — dropping it while a
+pre-toggle session's blocking PreToolUse is still waiting would leave Claude
+hung on that hook with neither surface answering. Excluding at the matcher is
+the clean cut for the hook path: the hook simply never runs.
+
+### Second surfacing path (added 0.24.7)
+
+Claude AskUserQuestion reaches the Island through TWO independent paths, not
+just the hook. The original design (0.24.6) only excluded the hook and missed
+the second one, so the Island kept popping the question card even with the hook
+excluded (verified by capturing raw hook stdin: Claude still fires PreToolUse /
+PermissionRequest for AskUserQuestion to non-excluded matchers, but the Island
+card with full options appeared even though the *bridge* received nothing).
+
+The second path is `SessionStore.applyClaudeTranscriptQuestionFallback`: on a
+transcript file change (`JSONLInterruptWatcher` → `SessionMonitor.didObserveFileChange`
+→ `SessionStore.requestFileSync` → `ConversationParser.parseIncremental`), the
+store finds a `running` / `waitingForApproval` `askuserquestion` tool call in the
+parsed `chatItems` and reconstructs a question intervention
+(`claudeTranscriptQuestionIntervention`, `metadata["source"] == "claudeTranscriptQuestion"`),
+independent of any hook. This is why matcher exclusion alone did not silence the
+Island.
+
+Fix: gate `applyClaudeTranscriptQuestionFallback` on the same toggle. When
+`terminalHandlesAskUserQuestion` is on, it does not reconstruct the card and
+clears any card it previously surfaced. Unlike the hook path, this app-side drop
+is safe: the transcript fallback is a display reconstruction with no blocking
+hook waiting on it.
 
 ### Components
 

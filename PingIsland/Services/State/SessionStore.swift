@@ -4000,6 +4000,21 @@ actor SessionStore {
               session.ingress != .remoteBridge else { return }
 
         let fallbackSource = "claudeTranscriptQuestion"
+
+        // When the user routes AskUserQuestion to the terminal, do not
+        // reconstruct a question card from the transcript. The terminal renders
+        // Claude's native picker and the Island stays silent for the question;
+        // clear any card this fallback already surfaced.
+        if UserDefaults.standard.bool(forKey: AppSettingsDefaultKeys.terminalHandlesAskUserQuestion) {
+            if session.intervention?.metadata["source"] == fallbackSource {
+                session.intervention = nil
+                if session.phase == .waitingForInput {
+                    session.phase = .processing
+                }
+            }
+            return
+        }
+
         let currentSource = session.intervention?.metadata["source"]
         if let currentSource, currentSource != fallbackSource {
             return
