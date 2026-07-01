@@ -2,14 +2,14 @@ import XCTest
 @testable import Ping_Island
 
 final class AppLanguageTests: XCTestCase {
-    func testSystemLanguagePrefersSimplifiedChineseForChineseLocales() {
+    func testSystemLanguagePrefersTraditionalChineseForChineseLocales() {
         XCTAssertEqual(
             AppLanguage.system.resolvedLanguageCode(preferredLanguages: ["zh-Hans-CN"]),
-            "zh-Hans"
+            "zh-Hant"
         )
         XCTAssertEqual(
             AppLanguage.system.resolvedLanguageCode(preferredLanguages: ["zh-TW"]),
-            "zh-Hans"
+            "zh-Hant"
         )
     }
 
@@ -25,7 +25,7 @@ final class AppLanguageTests: XCTestCase {
     }
 
     func testExplicitLanguageSelectionsStayStable() {
-        XCTAssertEqual(AppLanguage.simplifiedChinese.resolvedLanguageCode(), "zh-Hans")
+        XCTAssertEqual(AppLanguage.traditionalChinese.resolvedLanguageCode(), "zh-Hant")
         XCTAssertEqual(AppLanguage.english.resolvedLanguageCode(), "en")
     }
 }

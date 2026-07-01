@@ -147,7 +147,7 @@ enum UpdateReleaseNotesParser {
 
     private static func preferredLanguageCode(for locale: Locale?) -> String {
         let languageCode = locale?.identifier.lowercased() ?? "en"
-        return languageCode.hasPrefix("zh") ? "zh-Hans" : "en"
+        return languageCode.hasPrefix("zh") ? "zh-Hant" : "en"
     }
 
     private static func localizedBlocks(from markdown: String) -> [String: String] {
@@ -185,8 +185,8 @@ enum UpdateReleaseNotesParser {
 
     private static func languageMarker(in line: String) -> String? {
         switch line.trimmingCharacters(in: .whitespacesAndNewlines) {
-        case "<!-- zh-Hans -->":
-            return "zh-Hans"
+        case "<!-- zh-Hant -->", "<!-- zh-Hans -->":
+            return "zh-Hant"
         case "<!-- en -->":
             return "en"
         default:

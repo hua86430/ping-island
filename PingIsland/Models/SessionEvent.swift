@@ -457,7 +457,7 @@ extension HookEvent {
            let json = String(data: data, encoding: .utf8) {
             metadata["toolInputJSON"] = json
         }
-        // 保存原始 toolUseId，用于后续响应
+        // 儲存原始 toolUseId，用於後續回應
         if let toolUseId = toolUseId {
             metadata["originalToolUseId"] = toolUseId
         }

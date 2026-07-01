@@ -24,7 +24,7 @@ enum AppSettingsDefaultKeys {
 
 enum AppLanguage: String, CaseIterable, Identifiable {
     case system
-    case simplifiedChinese
+    case traditionalChinese
     case english
 
     var id: String { rawValue }
@@ -33,8 +33,8 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         switch self {
         case .system:
             return "跟随系统"
-        case .simplifiedChinese:
-            return "简体中文"
+        case .traditionalChinese:
+            return "繁體中文"
         case .english:
             return "English"
         }
@@ -45,11 +45,11 @@ enum AppLanguage: String, CaseIterable, Identifiable {
         case .system:
             let preferredLanguage = preferredLanguages.first?.lowercased() ?? ""
             if preferredLanguage.hasPrefix("zh") {
-                return "zh-Hans"
+                return "zh-Hant"
             }
             return "en"
-        case .simplifiedChinese:
-            return "zh-Hans"
+        case .traditionalChinese:
+            return "zh-Hant"
         case .english:
             return "en"
         }

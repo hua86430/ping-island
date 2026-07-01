@@ -387,15 +387,15 @@ actor TelemetryService {
 
     private func languageBucket() -> String {
         let raw = defaults.string(forKey: "appLanguage") ?? "system"
-        if raw == AppLanguage.simplifiedChinese.rawValue {
-            return "zh-Hans"
+        if raw == AppLanguage.traditionalChinese.rawValue {
+            return "zh-Hant"
         }
         if raw == AppLanguage.english.rawValue {
             return "en"
         }
         let preferred = Locale.preferredLanguages.first?.lowercased() ?? ""
         if preferred.hasPrefix("zh") {
-            return "zh-Hans"
+            return "zh-Hant"
         }
         if preferred.hasPrefix("en") {
             return "en"
