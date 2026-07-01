@@ -73,4 +73,19 @@ final class AskUserQuestionExclusionTests: XCTestCase {
         let post = try XCTUnwrap(hooks["PostToolUse"] as? [[String: Any]])
         XCTAssertEqual(post.first?["matcher"] as? String, "*")
     }
+
+    @MainActor
+    func testSettingDefaultsToFalseAndPersists() {
+        let key = AppSettingsDefaultKeys.terminalHandlesAskUserQuestion
+        let had = UserDefaults.standard.object(forKey: key) != nil
+        let prev = UserDefaults.standard.bool(forKey: key)
+        UserDefaults.standard.removeObject(forKey: key)
+        defer { had ? UserDefaults.standard.set(prev, forKey: key) : UserDefaults.standard.removeObject(forKey: key) }
+
+        // Property exists and mirrors the persisted default (false when unset).
+        XCTAssertFalse(AppSettingsStore.shared.terminalHandlesAskUserQuestion)
+        AppSettingsStore.shared.terminalHandlesAskUserQuestion = true
+        XCTAssertTrue(UserDefaults.standard.bool(forKey: key))
+        AppSettingsStore.shared.terminalHandlesAskUserQuestion = false
+    }
 }

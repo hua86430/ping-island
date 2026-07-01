@@ -953,6 +953,17 @@ final class AppSettingsStore: ObservableObject {
         }
     }
 
+    @Published var terminalHandlesAskUserQuestion: Bool {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(terminalHandlesAskUserQuestion, forKey: AppSettingsDefaultKeys.terminalHandlesAskUserQuestion)
+            recordTelemetrySettingChange(
+                key: AppSettingsDefaultKeys.terminalHandlesAskUserQuestion,
+                value: terminalHandlesAskUserQuestion.description
+            )
+        }
+    }
+
     @Published var autoRoutePromptsToTerminalWhenIdleEnabled: Bool {
         didSet {
             guard !isBootstrapping else { return }
@@ -1563,6 +1574,12 @@ final class AppSettingsStore: ObservableObject {
             default: false
         )
         _routePromptsToTerminal = Published(initialValue: routePromptsToTerminal)
+        _terminalHandlesAskUserQuestion = Published(initialValue: Self.boolValue(
+            from: defaults,
+            key: AppSettingsDefaultKeys.terminalHandlesAskUserQuestion,
+            exists: persistedKeys.contains(AppSettingsDefaultKeys.terminalHandlesAskUserQuestion),
+            default: false
+        ))
         _autoRoutePromptsToTerminalWhenIdleEnabled = Published(initialValue: Self.boolValue(
             from: defaults,
             key: Keys.autoRoutePromptsToTerminalWhenIdleEnabled,
