@@ -855,7 +855,8 @@ class SessionMonitor: ObservableObject {
 
     /// When Claude is resumed or restarted, concurrent hook events can create multiple
     /// sessions for the same project before endOrphanedSessions has a chance to clean up.
-    /// Keep only the most recently active session per provider + cwd pair.
+    /// Keep only the most recently active session per provider + cwd + terminal identity
+    /// (falling back to sessionId when no terminal identity is available).
     nonisolated static func deduplicateSameProjectClaudeSessions(
         from sessions: [SessionState]
     ) -> [SessionState] {

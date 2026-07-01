@@ -361,6 +361,8 @@ In `PingIsland/Services/State/SessionStore.swift`, in `endOrphanedSessions`, imm
 Run: `xcodebuild -project PingIsland.xcodeproj -scheme PingIsland -configuration Debug CODE_SIGNING_ALLOWED=NO test -only-testing:PingIslandTests/SessionStoreTerminalOrphanTests`
 Expected: PASS (2 tests).
 
+Implementation note: test assertions call `await store.session(for:)` into a `let` binding first, then pass the binding to `XCTAssertNil`/`XCTAssertNotNil`, rather than `await`-ing inside the assert's autoclosure argument — Swift 6.1.2 strict concurrency rejects the latter.
+
 - [ ] **Step 5: Commit**
 
 ```bash
