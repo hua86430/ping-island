@@ -136,10 +136,12 @@ jobs:
             cp "$notes_src" "$notes_asset"
           fi
 
-          gen=$(find "$HOME/Library/Developer/Xcode/DerivedData" "$GITHUB_WORKSPACE/build" \
-                 -type f -name generate_appcast -path '*sparkle*bin*' 2>/dev/null | head -1)
+          search_roots=()
+          [ -d "$GITHUB_WORKSPACE/build" ] && search_roots+=("$GITHUB_WORKSPACE/build")
+          [ -d "$HOME/Library/Developer/Xcode/DerivedData" ] && search_roots+=("$HOME/Library/Developer/Xcode/DerivedData")
+          gen=$(find "${search_roots[@]}" -type f -name generate_appcast -path '*sparkle*bin*' 2>/dev/null | head -1 || true)
           if [ -z "$gen" ]; then
-            echo "::error::generate_appcast tool not found in DerivedData"
+            echo "::error::generate_appcast tool not found under ${search_roots[*]:-<none>}"
             exit 1
           fi
           echo "Using generate_appcast: $gen"
