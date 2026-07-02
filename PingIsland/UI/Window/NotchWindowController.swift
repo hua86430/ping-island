@@ -13,6 +13,7 @@ class NotchWindowController: NSWindowController {
     let viewModel: NotchViewModel
     private var fullWindowFrame: NSRect
     private var cancellables = Set<AnyCancellable>()
+    private var hoverSensor: NotchHoverSensorWindow!
 
     static let windowHeight: CGFloat = 750
 
@@ -59,6 +60,13 @@ class NotchWindowController: NSWindowController {
 
         notchWindow.setFrame(windowFrame, display: true)
 
+        // Hover-sensor window: drives idle-independent hover-open (click/drag
+        // still ride the local NSEvent monitor into handleMouseDown).
+        hoverSensor = NotchHoverSensorWindow(
+            onEnter: { [weak viewModel] in viewModel?.hoverSensorEntered() },
+            onExit: { [weak viewModel] in viewModel?.hoverSensorExited() }
+        )
+
         // Dynamically toggle mouse event handling based on notch state:
         // - Closed: ignoresMouseEvents = true (clicks pass through to menu bar/apps)
         // - Opened: ignoresMouseEvents = false (buttons inside panel work)
@@ -79,6 +87,24 @@ class NotchWindowController: NSWindowController {
             .store(in: &cancellables)
 
         viewModel.$isFullscreenEdgeRevealActive
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak notchWindow, weak viewModel] _ in
+                guard let self, let notchWindow, let viewModel else { return }
+                self.updateWindowPresentation(window: notchWindow, viewModel: viewModel)
+            }
+            .store(in: &cancellables)
+
+        // Geometry / closed-width changes move the trigger rect; refresh the
+        // sensor (and opened-close rect) via the same chokepoint.
+        viewModel.$geometry
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak notchWindow, weak viewModel] _ in
+                guard let self, let notchWindow, let viewModel else { return }
+                self.updateWindowPresentation(window: notchWindow, viewModel: viewModel)
+            }
+            .store(in: &cancellables)
+
+        viewModel.$closedWidth
             .receive(on: DispatchQueue.main)
             .sink { [weak self, weak notchWindow, weak viewModel] _ in
                 guard let self, let notchWindow, let viewModel else { return }
@@ -160,6 +186,11 @@ class NotchWindowController: NSWindowController {
     }
 
     private func updateWindowPresentation(window: NotchPanel, viewModel: NotchViewModel) {
+        // Drive the hover sensor first — this must run even in hidden states
+        // (which early-return below) so the sensor orders out when suppressed
+        // and re-frames to the reveal rect in fullscreen edge-reveal.
+        hoverSensor.update(rect: viewModel.status == .opened ? nil : viewModel.hoverSensorRect)
+
         let shouldHideWindow = viewModel.shouldHideWindowPresentation
 
         if shouldHideWindow {
