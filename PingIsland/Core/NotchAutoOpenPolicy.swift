@@ -14,4 +14,25 @@ enum NotchAutoOpenPolicy {
         guard feedMode else { return !newPending.isEmpty }
         return newPending.contains { $0.needsPromptNotification }
     }
+
+    /// A `.notification`-opened panel is sitting on the FEED route (not an
+    /// attention card, not the completion card, not chat). Such a panel is a
+    /// transient banner: it must self-dismiss after the banner interval.
+    nonisolated static func shouldArmFeedBannerDismissal(
+        feedMode: Bool,
+        isOpened: Bool,
+        openedByNotification: Bool,
+        hasAttentionSession: Bool,
+        hasActiveCompletionCard: Bool,
+        isChatContent: Bool,
+        unreadCount: Int
+    ) -> Bool {
+        feedMode
+            && isOpened
+            && openedByNotification
+            && !hasAttentionSession
+            && !hasActiveCompletionCard
+            && !isChatContent
+            && unreadCount > 0
+    }
 }

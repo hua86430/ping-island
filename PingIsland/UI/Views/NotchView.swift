@@ -57,6 +57,8 @@ struct NotchView: View {
     @State private var activeCompletionNotification: SessionCompletionNotification?
     @State private var completionNotificationDismissWorkItem: DispatchWorkItem?
     @State private var shouldDismissCompletionNotificationOnHoverExit: Bool = false
+    @State private var feedBannerDismissWorkItem: DispatchWorkItem?
+    @State private var shouldDismissFeedBannerOnHoverExit = false
     @State private var isShowingDetachmentHint: Bool = false
     @State private var detachmentHintDismissWorkItem: DispatchWorkItem?
     @State private var detachmentHintPresentationWorkItem: DispatchWorkItem?
@@ -861,7 +863,8 @@ struct NotchView: View {
             onCompletionNotificationHoverChanged: handleCompletionNotificationHover,
             onDismissCompletionNotification: {
                 clearCompletionNotifications(keepPanelOpen: true)
-            }
+            },
+            onFeedHoverChanged: handleFeedBannerHover
         )
         .frame(width: notchSize.width - 24) // Fixed width to prevent text reflow
         // Removed .id() - was causing view recreation and performance issues
@@ -1042,6 +1045,7 @@ struct NotchView: View {
            viewModel.status == .closed,
            !shouldSuppressAutoOpen {
             viewModel.notchOpen(reason: .notification)
+            armFeedBannerDismissalIfNeeded()
         }
 
         previousPendingIds = currentIds
@@ -1110,6 +1114,15 @@ struct NotchView: View {
         if viewModel.shouldSuppressAutomaticPresentation {
             return
         }
+
+        // The panel is about to switch to attention/chat content while staying
+        // under .notification control. The feed-banner guard only checks
+        // status/openReason/pending-permission/intervention, not route, so a
+        // stale timer from a previously-shown feed banner could still fire and
+        // close this content out from under the user.
+        feedBannerDismissWorkItem?.cancel()
+        feedBannerDismissWorkItem = nil
+        shouldDismissFeedBannerOnHoverExit = false
 
         if targetSession.needsPromptNotification {
             viewModel.presentNotificationAttention()
@@ -1460,6 +1473,63 @@ struct NotchView: View {
                 maybePresentNextCompletionNotification()
             }
         }
+
+        armFeedBannerDismissalIfNeeded()
+    }
+
+    private var hasResolvedAttentionSession: Bool {
+        IslandExpandedRouteResolver.highestPriorityAttentionSession(
+            from: sessionMonitor.instances
+        ) != nil
+    }
+
+    private func armFeedBannerDismissalIfNeeded() {
+        let isChat: Bool
+        if case .chat = viewModel.contentType { isChat = true } else { isChat = false }
+        guard NotchAutoOpenPolicy.shouldArmFeedBannerDismissal(
+            feedMode: AppSettings.shared.notificationFeedMode,
+            isOpened: viewModel.status == .opened,
+            openedByNotification: viewModel.openReason == .notification,
+            hasAttentionSession: hasResolvedAttentionSession,
+            hasActiveCompletionCard: activeCompletionNotification != nil,
+            isChatContent: isChat,
+            unreadCount: unreadFeedCount
+        ) else { return }
+        scheduleFeedBannerDismissal()
+    }
+
+    private func scheduleFeedBannerDismissal() {
+        feedBannerDismissWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [self] in
+            dismissFeedBannerIfStillPassive()
+        }
+        feedBannerDismissWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5, execute: workItem)
+    }
+
+    private func dismissFeedBannerIfStillPassive() {
+        feedBannerDismissWorkItem = nil
+        shouldDismissFeedBannerOnHoverExit = false
+        if viewModel.status == .opened,
+           viewModel.openReason == .notification,
+           !hasPendingPermission,
+           !hasHumanIntervention {
+            viewModel.notchClose()
+        }
+    }
+
+    private func handleFeedBannerHover(_ isHovering: Bool) {
+        guard AppSettings.shared.notificationFeedMode,
+              viewModel.openReason == .notification else { return }
+        if isHovering {
+            shouldDismissFeedBannerOnHoverExit = feedBannerDismissWorkItem != nil
+            feedBannerDismissWorkItem?.cancel()
+            feedBannerDismissWorkItem = nil
+            return
+        }
+        guard shouldDismissFeedBannerOnHoverExit else { return }
+        shouldDismissFeedBannerOnHoverExit = false
+        dismissFeedBannerIfStillPassive()
     }
 
     private func isCompletionNotificationConsumed(

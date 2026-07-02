@@ -147,4 +147,24 @@ final class NotificationFeedTests: XCTestCase {
         XCTAssertTrue(NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(newPending: [bareReady, question], feedMode: true))
         XCTAssertFalse(NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(newPending: [], feedMode: true))
     }
+
+    func testFeedBannerArmingPredicate() {
+        func arm(feed: Bool = true, opened: Bool = true, byNotification: Bool = true,
+                 attention: Bool = false, completionCard: Bool = false, chat: Bool = false,
+                 unread: Int = 1) -> Bool {
+            NotchAutoOpenPolicy.shouldArmFeedBannerDismissal(
+                feedMode: feed, isOpened: opened, openedByNotification: byNotification,
+                hasAttentionSession: attention, hasActiveCompletionCard: completionCard,
+                isChatContent: chat, unreadCount: unread
+            )
+        }
+        XCTAssertTrue(arm())                                  // notification-opened feed with unread → arm
+        XCTAssertFalse(arm(feed: false))                      // session mode never arms
+        XCTAssertFalse(arm(opened: false))                    // closed panel
+        XCTAssertFalse(arm(byNotification: false))            // hover/click-opened = manual control
+        XCTAssertFalse(arm(attention: true))                  // attention card stays
+        XCTAssertFalse(arm(completionCard: true))             // completion card has its own timer
+        XCTAssertFalse(arm(chat: true))                       // chat stays
+        XCTAssertFalse(arm(unread: 0))                        // nothing to preview
+    }
 }

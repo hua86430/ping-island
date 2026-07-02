@@ -13,6 +13,7 @@ struct IslandOpenedContentView: View {
     let onAttentionActionCompleted: () -> Void
     let onCompletionNotificationHoverChanged: (Bool) -> Void
     let onDismissCompletionNotification: () -> Void
+    var onFeedHoverChanged: (Bool) -> Void = { _ in }
 
     var body: some View {
         routeContent
@@ -43,7 +44,8 @@ struct IslandOpenedContentView: View {
             if settings.notificationFeedMode {
                 NotificationFeedView(
                     sessionMonitor: sessionMonitor,
-                    viewModel: viewModel
+                    viewModel: viewModel,
+                    onHoverChanged: onFeedHoverChanged
                 )
             } else {
                 SessionListView(
@@ -59,7 +61,8 @@ struct IslandOpenedContentView: View {
                 // surface the unread feed, never the full session preview list.
                 NotificationFeedView(
                     sessionMonitor: sessionMonitor,
-                    viewModel: viewModel
+                    viewModel: viewModel,
+                    onHoverChanged: onFeedHoverChanged
                 )
             } else {
                 SessionHoverDashboardView(

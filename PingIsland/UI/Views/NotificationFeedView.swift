@@ -3,6 +3,7 @@ import SwiftUI
 struct NotificationFeedView: View {
     @ObservedObject var sessionMonitor: SessionMonitor
     @ObservedObject var viewModel: NotchViewModel
+    var onHoverChanged: (Bool) -> Void = { _ in }
 
     /// Pure feed selection: unread only, newest activity first.
     nonisolated static func feedSessions(from sessions: [SessionState]) -> [SessionState] {
@@ -68,6 +69,7 @@ struct NotificationFeedView: View {
             )
         }
         .scrollBounceBehavior(.basedOnSize)
+        .onHover(perform: onHoverChanged)
     }
 
     private func open(_ session: SessionState) {
