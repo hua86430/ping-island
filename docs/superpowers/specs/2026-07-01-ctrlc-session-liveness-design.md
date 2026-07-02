@@ -105,6 +105,15 @@ encapsulates this and returns the matching pid (for storing) or nil.
 - Remote and tmux-unresolvable sessions are never falsely removed.
 - No behavior change for non-Claude providers, sessions with a real pid, or sessions needing manual attention.
 
+## Feed mode interaction
+
+This spec predates notification feed mode (`2026-07-02-notification-feed-mode-design.md`).
+No behavior change is needed for the feed: reap removes the session from the
+store, and the feed renders only `hasUnread` sessions still tracked in the
+store, so a reaped Ctrl-C'd session leaves the feed automatically (its per-session
+unread is cleared as a side effect of removal). Decision (2026-07-03): keep reap
+semantics; do NOT preserve the session as `.ended`-with-unread in feed mode.
+
 ## Out of scope
 
 - Populating pid in the bridge itself (this fixes it app-side via tty).
