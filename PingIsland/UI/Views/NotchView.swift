@@ -693,7 +693,9 @@ struct NotchView: View {
                                     providerTitle: closedTrailingUsageProviderTitle,
                                     window: usageWindow
                                 )
-                            } else if activeSessionCount > 0 {
+                            } else if activeSessionCount > 0 && !AppSettings.shared.notificationFeedMode {
+                                // Feed mode shows only the unread badge; the
+                                // session-count indicator stays hidden.
                                 SessionCountIndicator(count: activeSessionCount)
                             }
                         }

@@ -85,7 +85,10 @@ private struct NotificationFeedRow: View {
     @ObservedObject private var settings = AppSettings.shared
 
     private var previewLine: String? {
-        SessionTextSanitizer.sanitizedDisplayText(session.previewText)
+        // Latest LLM reply, falling back to the prompt preview, then the folder.
+        SessionTextSanitizer.sanitizedDisplayText(session.lastMessage)
+            ?? SessionTextSanitizer.sanitizedDisplayText(session.previewText)
+            ?? session.projectName
     }
 
     private var timeLabel: String {
@@ -108,11 +111,6 @@ private struct NotificationFeedRow: View {
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundColor(.white.opacity(0.5))
                     }
-
-                    Text(session.projectName)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.5))
-                        .lineLimit(1)
 
                     if let previewLine {
                         Text(previewLine)

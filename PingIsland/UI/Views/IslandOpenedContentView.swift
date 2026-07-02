@@ -54,12 +54,21 @@ struct IslandOpenedContentView: View {
                 )
             }
         case .hoverDashboard:
-            SessionHoverDashboardView(
-                sessions: hoverPreviewSessions,
-                sessionMonitor: sessionMonitor,
-                density: surface == .floating ? .detachedCompact : .regular,
-                onQuestionInteractionStateChanged: { viewModel.setInlineTextInputActive($0) }
-            )
+            if settings.notificationFeedMode {
+                // Feed mode replaces the hover dashboard too: hover/click both
+                // surface the unread feed, never the full session preview list.
+                NotificationFeedView(
+                    sessionMonitor: sessionMonitor,
+                    viewModel: viewModel
+                )
+            } else {
+                SessionHoverDashboardView(
+                    sessions: hoverPreviewSessions,
+                    sessionMonitor: sessionMonitor,
+                    density: surface == .floating ? .detachedCompact : .regular,
+                    onQuestionInteractionStateChanged: { viewModel.setInlineTextInputActive($0) }
+                )
+            }
         case .attentionNotification(let session):
             SessionAttentionNotificationView(
                 session: liveSession(for: session),
