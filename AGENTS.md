@@ -180,6 +180,12 @@ Unsigned builds trip Gatekeeper on first manual install (right-click Open, or `x
 - When adding bundled assets or fonts, make sure app startup initializes them.
 - Keep this file high-signal. If a section becomes long, move the durable detail into a dedicated markdown doc and link it here.
 
+## Release Notes Rule
+
+- Every release MUST have `releases/notes/<version>.md` written BEFORE pushing the `v*` tag. CI reads that file into the GitHub release body and the Sparkle notes asset; a missing file ships a boilerplate-only release.
+- Notes are written in Traditional Chinese (繁體中文) and must state concretely what was 新增 (added), 修改 (changed), 修復 (fixed), or 移除 (removed) — use those as section headers, omit empty sections. Cover every user-visible change since the previous tag (`git log --oneline v<prev>..HEAD` is the checklist).
+- The full release flow (notes → version bump → tag → CI monitoring → asset verification) is documented in `.claude/skills/release/SKILL.md`; follow it for every release.
+
 ## Verification Checklist
 
 - Can the main Xcode scheme still build?
