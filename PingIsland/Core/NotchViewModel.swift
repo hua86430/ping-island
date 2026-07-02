@@ -497,13 +497,6 @@ class NotchViewModel: ObservableObject {
     private func setupEventHandlers() {
         guard let events else { return }
 
-        events.mouseLocation
-            .throttle(for: .milliseconds(50), scheduler: DispatchQueue.main, latest: true)
-            .sink { [weak self] location in
-                self?.handleMouseMove(location)
-            }
-            .store(in: &cancellables)
-
         events.mouseDown
             .receive(on: DispatchQueue.main)
             .sink { [weak self] event in
@@ -534,44 +527,6 @@ class NotchViewModel: ObservableObject {
 
     /// The chat session we're currently presenting while the island stays open.
     private var currentChatSession: SessionState?
-
-    private func handleMouseMove(_ location: CGPoint) {
-        guard presentationMode == .docked else { return }
-
-        let inNotch = isPointInHoverTrigger(location)
-        let inOpened = status == .opened && geometry.isPointInOpenedPanel(location, size: openedSize)
-
-        let newHovering = inNotch || inOpened
-
-        // Only update if changed to prevent unnecessary re-renders
-        guard newHovering != isHovering else { return }
-
-        isHovering = newHovering
-
-        // Cancel any pending hover timer
-        hoverTimer?.cancel()
-        hoverTimer = nil
-
-        if Self.shouldAutoCollapseHoverPreview(
-            isHovering: newHovering,
-            status: status,
-            openReason: openReason,
-            isSettingsPopoverPresented: isSettingsPopoverPresented,
-            isInlineTextInputActive: isInlineTextInputActive,
-            autoCollapseOnLeave: AppSettings.autoCollapseOnLeave
-        ) {
-            notchClose()
-        }
-
-        // Start hover timer to auto-expand after a short dwell
-        if isHovering && (status == .closed || status == .popping) {
-            let workItem = DispatchWorkItem { [weak self] in
-                self?.performDeferredHoverOpenIfNeeded()
-            }
-            hoverTimer = workItem
-            DispatchQueue.main.asyncAfter(deadline: .now() + hoverActivationDelay, execute: workItem)
-        }
-    }
 
     private func handleMouseDown(_ event: NSEvent) {
         guard presentationMode == .docked else { return }
@@ -850,6 +805,48 @@ class NotchViewModel: ObservableObject {
         guard isHovering else { return }
         guard status == .closed || status == .popping else { return }
         notchOpen(reason: .hover)
+    }
+
+    /// Cursor entered the closed-notch hover-sensor rect (real or synthetic).
+    /// Idempotent: only starts the dwell on a not-hovering -> hovering edge, so
+    /// a sensor re-show under a stationary cursor after a close does not reopen.
+    func hoverSensorEntered() {
+        guard presentationMode == .docked else { return }
+        guard status == .closed || status == .popping else { return }
+        guard !isHovering else { return }
+        isHovering = true
+        hoverTimer?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.performDeferredHoverOpenIfNeeded()
+        }
+        hoverTimer = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + hoverActivationDelay, execute: workItem)
+    }
+
+    /// Cursor left the closed-notch hover-sensor rect.
+    func hoverSensorExited() {
+        hoverTimer?.cancel()
+        hoverTimer = nil
+        isHovering = false
+    }
+
+    /// Cursor left the opened panel rect.
+    func openedPanelExited() {
+        guard presentationMode == .docked else { return }
+        guard status == .opened else { return }
+        // Backstop against a stale tracking rect: re-check the current panel rect.
+        if openedPanelScreenRect.contains(NSEvent.mouseLocation) { return }
+        isHovering = false
+        if Self.shouldAutoCollapseHoverPreview(
+            isHovering: false,
+            status: status,
+            openReason: openReason,
+            isSettingsPopoverPresented: isSettingsPopoverPresented,
+            isInlineTextInputActive: isInlineTextInputActive,
+            autoCollapseOnLeave: AppSettings.autoCollapseOnLeave
+        ) {
+            notchClose()
+        }
     }
 
     func notchClose() {
