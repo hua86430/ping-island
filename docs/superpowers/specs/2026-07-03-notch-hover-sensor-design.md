@@ -10,6 +10,17 @@ because `EventMonitor` already installs a local monitor that observes clicks on
 our own windows (see Finding 1 below). The opened-state close rect was corrected
 from the full window bounds to the actual panel rect.
 
+Revision 2 (2026-07-03, during implementation): the opened-state close-on-leave
+`NSTrackingArea` did NOT work at runtime. Logging showed neither the opened
+overlay's `mouseExited` nor the sensor's `mouseExited` fired when leaving an open
+panel: while opened, the full-size notch window (`ignoresMouseEvents = false`)
+sits over the sensor and the `hitTest`-transparent overlay on the SwiftUI hosting
+view never received tracking events. Close-on-leave was reimplemented as a
+BOUNDED timer (`hoverCloseTimer`, 0.1s) that runs only while opened via hover and
+stops on close; each tick closes once the cursor leaves the panel-plus-notch
+region. Hover-OPEN keeps the reliable sensor tracking area (verified). Verified at
+runtime: hover opens the idle notch and leaving closes it.
+
 ## Problem
 
 The docked notch opens on hover and closes when the cursor leaves. Both are

@@ -187,8 +187,9 @@ class NotchWindowController: NSWindowController {
 
     private func updateWindowPresentation(window: NotchPanel, viewModel: NotchViewModel) {
         // Drive the hover sensor first — this must run even in hidden states
-        // (which early-return below) so the sensor orders out when suppressed
-        // and re-frames to the reveal rect in fullscreen edge-reveal.
+        // (which early-return below) so the sensor orders out when suppressed and
+        // re-frames to the reveal rect in fullscreen edge-reveal. Ordered out
+        // while opened; the bounded hover-close timer handles close-on-leave.
         hoverSensor.update(rect: viewModel.status == .opened ? nil : viewModel.hoverSensorRect)
 
         let shouldHideWindow = viewModel.shouldHideWindowPresentation

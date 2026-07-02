@@ -10,6 +10,8 @@
 
 **Revision note:** revised after a Fable 5 plan review that found four blocking issues (fixed below): sensor update was placed after `updateWindowPresentation`'s hidden-state early return; the opened-close overlay lacked a frame + `hitTest` override; the sensor/close rects were not refreshed on all geometry/size changes; and plan/spec disagreed on the hidden-state sensor. The spec was updated to match the resolved semantics.
 
+**Revision 2 (during implementation):** Task 5's opened-close `NSTrackingArea` did not fire at runtime (the opened full-size notch window occludes the sensor, and the `hitTest`-nil overlay on the SwiftUI hosting view never received tracking events — confirmed by logging). Task 5 was reimplemented as a bounded `hoverCloseTimer` (0.1s) in `NotchViewModel` that runs only while opened via hover and closes once the cursor leaves `openedHoverRegionRect` (panel ∪ trigger). No overlay view, no extra sinks. Hover-OPEN keeps the sensor tracking area. See the Task 5 section below for the shipped shape.
+
 ## Global Constraints
 
 - Branch: `notch-hover-tracking-area`. Develop + verify on a local Debug build before merging to main.

@@ -273,6 +273,7 @@ class NotchViewModel: ObservableObject {
     private let autoHideWhenIdleProvider: @MainActor () -> Bool
     private let notchModuleWidthProvider: @MainActor () -> Double
     private var hoverTimer: DispatchWorkItem?
+    private var hoverCloseTimer: Timer?
     // Keep hover previews feeling responsive without making incidental cursor
     // passes over the notch expand it too aggressively.
     private let fullscreenHoverActivationDelay: TimeInterval = 0.18
@@ -738,6 +739,13 @@ class NotchViewModel: ObservableObject {
         geometry.openedScreenRect(for: openedSize)
     }
 
+    /// Close-on-leave region while opened: the panel plus the notch trigger rect,
+    /// so hovering the notch bar (where hover-open lands the cursor) counts as
+    /// inside and the notch only closes once the cursor leaves both.
+    var openedHoverRegionRect: CGRect {
+        openedPanelScreenRect.union(hoverTriggerRect)
+    }
+
     func updateIdleAutoHiddenState(hasVisibleSessionActivity: Bool) {
         let shouldHide = autoHideWhenIdleProvider() && !hasVisibleSessionActivity
         if shouldHide != isIdleAutoHiddenActive {
@@ -788,6 +796,7 @@ class NotchViewModel: ObservableObject {
 
         // Hover opens a lightweight preview instead of restoring the full chat view.
         if reason == .hover {
+            startHoverCloseTimer()
             return
         }
 
@@ -808,14 +817,11 @@ class NotchViewModel: ObservableObject {
     }
 
     /// Cursor entered the closed-notch hover-sensor rect (real or synthetic).
-    /// Idempotent: only starts the dwell on a not-hovering -> hovering edge, so
-    /// a sensor re-show under a stationary cursor after a close does not reopen.
     func hoverSensorEntered() {
         guard presentationMode == .docked else { return }
         guard status == .closed || status == .popping else { return }
-        guard !isHovering else { return }
         isHovering = true
-        hoverTimer?.cancel()
+        guard hoverTimer == nil else { return }
         let workItem = DispatchWorkItem { [weak self] in
             self?.performDeferredHoverOpenIfNeeded()
         }
@@ -830,12 +836,27 @@ class NotchViewModel: ObservableObject {
         isHovering = false
     }
 
-    /// Cursor left the opened panel rect.
-    func openedPanelExited() {
-        guard presentationMode == .docked else { return }
-        guard status == .opened else { return }
-        // Backstop against a stale tracking rect: re-check the current panel rect.
-        if openedPanelScreenRect.contains(NSEvent.mouseLocation) { return }
+    /// While a hover-opened panel is showing, the energy-gated mouseMoved monitor
+    /// is off, so close-on-leave is driven by a bounded timer that fires only
+    /// while opened via hover and stops on close. It closes once the cursor
+    /// leaves the panel-plus-notch region.
+    private func startHoverCloseTimer() {
+        stopHoverCloseTimer()
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.hoverCloseTick() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        hoverCloseTimer = timer
+    }
+
+    private func stopHoverCloseTimer() {
+        hoverCloseTimer?.invalidate()
+        hoverCloseTimer = nil
+    }
+
+    private func hoverCloseTick() {
+        guard status == .opened else { stopHoverCloseTimer(); return }
+        if openedHoverRegionRect.contains(NSEvent.mouseLocation) { return }
         isHovering = false
         if Self.shouldAutoCollapseHoverPreview(
             isHovering: false,
@@ -850,6 +871,7 @@ class NotchViewModel: ObservableObject {
     }
 
     func notchClose() {
+        stopHoverCloseTimer()
         status = .closed
         currentChatSession = nil
         contentType = .instances
