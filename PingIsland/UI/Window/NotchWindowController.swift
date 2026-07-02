@@ -11,8 +11,20 @@ import SwiftUI
 
 class NotchWindowController: NSWindowController {
     let viewModel: NotchViewModel
-    private let fullWindowFrame: NSRect
+    private var fullWindowFrame: NSRect
     private var cancellables = Set<AnyCancellable>()
+
+    static let windowHeight: CGFloat = 750
+
+    /// Full-width docked window frame pinned to the top of the given screen.
+    static func dockedWindowFrame(screenFrame: CGRect) -> NSRect {
+        NSRect(
+            x: screenFrame.origin.x,
+            y: screenFrame.maxY - windowHeight,
+            width: screenFrame.width,
+            height: windowHeight
+        )
+    }
 
     init(
         screen: NSScreen,
@@ -25,13 +37,7 @@ class NotchWindowController: NSWindowController {
         let screenFrame = screen.frame
 
         // Window covers full width at top, tall enough for largest content (chat view)
-        let windowHeight: CGFloat = 750
-        let windowFrame = NSRect(
-            x: screenFrame.origin.x,
-            y: screenFrame.maxY - windowHeight,
-            width: screenFrame.width,
-            height: windowHeight
-        )
+        let windowFrame = Self.dockedWindowFrame(screenFrame: screenFrame)
         self.fullWindowFrame = windowFrame
 
         // Create the window
@@ -182,5 +188,13 @@ class NotchWindowController: NSWindowController {
         case .closed, .popping:
             window.ignoresMouseEvents = true
         }
+    }
+
+    /// Reposition the existing window onto a different screen without rebuilding it.
+    func moveToScreen(_ screen: NSScreen) {
+        let frame = Self.dockedWindowFrame(screenFrame: screen.frame)
+        guard frame != fullWindowFrame else { return }
+        fullWindowFrame = frame
+        window?.setFrame(frame, display: true)
     }
 }
