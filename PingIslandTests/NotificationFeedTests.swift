@@ -167,4 +167,11 @@ final class NotificationFeedTests: XCTestCase {
         XCTAssertFalse(arm(chat: true))                       // chat stays
         XCTAssertFalse(arm(unread: 0))                        // nothing to preview
     }
+
+    func testFeedBannerOpenTriggerForNewUnread() {
+        XCTAssertTrue(NotchAutoOpenPolicy.shouldOpenFeedBannerForNewUnread(hasNewUnread: true, feedMode: true))
+        XCTAssertFalse(NotchAutoOpenPolicy.shouldOpenFeedBannerForNewUnread(hasNewUnread: false, feedMode: true))
+        XCTAssertFalse(NotchAutoOpenPolicy.shouldOpenFeedBannerForNewUnread(hasNewUnread: true, feedMode: false))
+        XCTAssertFalse(NotchAutoOpenPolicy.shouldOpenFeedBannerForNewUnread(hasNewUnread: false, feedMode: false))
+    }
 }

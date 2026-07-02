@@ -56,6 +56,7 @@ triggers untouched.
 | New pending session, `needsPromptNotification` (question/approval, incl. terminal-routed reminder) | yes (T1/T2 as today) | attention card | none (stays until handled/gesture) |
 | New pending session, bare `.waitingForInput` (fresh session, prompt ready) | NO | — | — |
 | Completion notification (per `autoOpenCompletionPanel` / compacted setting) | yes (T3 as today) | completion card | existing 5 s timer |
+| NEW unread appears while the island is closed (assistant reply landed) | yes (new trigger; respects reminder-mute, automatic-presentation suppression, and smartSuppression like T1) | feed | NEW 5 s timer (same as row below) |
 | Any other `.notification` open landing on the feed route (T1 remnant, completion fall-through via `closePanel:false` / keepPanelOpen, session-vanished sync) | only if `unreadCount > 0` | feed | NEW 5 s timer (same semantics as completion: hover cancels, hover-exit closes, no force-close while `hasPendingPermission || hasHumanIntervention`) |
 | Boot animation (T4) | yes | instances/feed | existing 1 s auto-close |
 
@@ -93,6 +94,20 @@ triggers untouched.
 
 4. **Timer constant**: reuse the completion flow's 5 seconds (single shared
    constant; no new setting — YAGNI, revisit only if asked).
+
+3b. **Feed banner trigger on new unread** (added during live self-test)
+   Live testing exposed that the pre-existing completion-card presenter never
+   fires on this machine (all static guards pass — `autoOpenCompletionPanel`
+   on, no mute, no smartSuppression — yet three real reply completions
+   produced no card; a pre-existing issue outside this feature's diff). Relying
+   on it for the banner would leave "reply completed" with badge-only and no
+   pop. So feed mode gets its own banner trigger: when a session's `hasUnread`
+   transitions to true while the island is CLOSED, open it with
+   `reason: .notification` (feed route) and arm the 5 s banner timer.
+   Gates mirror T1: reminder-mute, `shouldSuppressAutomaticPresentation`, and
+   `smartSuppression` (user already watching the terminal sees the reply — no
+   pop). Decision logic in `NotchAutoOpenPolicy` for unit testing. The
+   completion-card mystery is left for its own diagnosis (out of scope).
 
 5. **Docs (deliverable, not follow-up)**: update `AGENTS.md`'s notification-feed
    routing bullet to state the WHEN rules (attention stays, completion banner

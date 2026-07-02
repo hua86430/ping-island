@@ -40,6 +40,7 @@ struct NotchView: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
     @State private var previousPendingIds: Set<String> = []
+    @State private var previousUnreadIds: Set<String> = []
     @State private var manualAttentionTracker = SessionManualAttentionTracker()
     @State private var previousCompletedReadyIds: Set<String> = []
     @State private var completionReadyTimestamps: [String: Date] = [:]
@@ -59,6 +60,7 @@ struct NotchView: View {
     @State private var shouldDismissCompletionNotificationOnHoverExit: Bool = false
     @State private var feedBannerDismissWorkItem: DispatchWorkItem?
     @State private var shouldDismissFeedBannerOnHoverExit = false
+    @State private var isFeedBannerHovered = false
     @State private var isShowingDetachmentHint: Bool = false
     @State private var detachmentHintDismissWorkItem: DispatchWorkItem?
     @State private var detachmentHintPresentationWorkItem: DispatchWorkItem?
@@ -431,6 +433,7 @@ struct NotchView: View {
                 handleManualAttentionChange(instances)
                 handleCompletedReadyChange(instances)
                 handleCompletionNotificationChange(instances)
+                handleFeedUnreadChange(instances)
             }
     }
 
@@ -1045,14 +1048,43 @@ struct NotchView: View {
            viewModel.status == .closed,
            !shouldSuppressAutoOpen {
             viewModel.notchOpen(reason: .notification)
-            armFeedBannerDismissalIfNeeded()
+            armFeedBannerDismissalIfNeeded(instances: sessions)
         }
 
         previousPendingIds = currentIds
     }
 
+    private func handleFeedUnreadChange(_ instances: [SessionState]) {
+        let currentUnreadIds = Set(instances.filter(\.hasUnread).map(\.stableId))
+        let newUnreadIds = currentUnreadIds.subtracting(previousUnreadIds)
+        defer { previousUnreadIds = currentUnreadIds }
+
+        if areReminderNotificationsSuppressed { return }
+        if viewModel.shouldSuppressAutomaticPresentation { return }
+        let shouldSuppressAutoOpen = settings.smartSuppression &&
+            TerminalVisibilityDetector.isTerminalVisibleOnCurrentSpace()
+        if shouldSuppressAutoOpen { return }
+
+        if NotchAutoOpenPolicy.shouldOpenFeedBannerForNewUnread(
+            hasNewUnread: !newUnreadIds.isEmpty,
+            feedMode: AppSettings.shared.notificationFeedMode
+        ),
+           viewModel.status == .closed {
+            viewModel.notchOpen(reason: .notification)
+            armFeedBannerDismissalIfNeeded(instances: instances)
+        } else if feedBannerDismissWorkItem == nil, !isFeedBannerHovered {
+            // Self-heal: a notification-opened panel can be left on the feed
+            // route with no timer (attention resolved while open, completion
+            // fall-through, arming race). Re-arm on the next tick so it always
+            // honors the 5-second banner contract. The predicate rejects every
+            // non-banner situation (manual opens, attention, completion, chat).
+            armFeedBannerDismissalIfNeeded(instances: instances)
+        }
+    }
+
     private func primeStartupPresentationState(_ instances: [SessionState]) {
         previousPendingIds = Set(instances.filter(\.needsAttention).map(\.stableId))
+        previousUnreadIds = Set(instances.filter(\.hasUnread).map(\.stableId))
         previousCompletedReadyIds = Set(
             instances
                 .filter { SessionCompletionStateEvaluator.isCompletedReadySession($0) }
@@ -1483,17 +1515,27 @@ struct NotchView: View {
         ) != nil
     }
 
-    private func armFeedBannerDismissalIfNeeded() {
+    private func armFeedBannerDismissalIfNeeded(instances: [SessionState]? = nil) {
+        // `$instances` publishers fire on willSet: inside those handlers the
+        // monitor's property still holds the OLD array, so attention/unread
+        // checks must use the freshly published value passed in by the caller.
+        let sessions = instances ?? sessionMonitor.instances
         let isChat: Bool
         if case .chat = viewModel.contentType { isChat = true } else { isChat = false }
+        let hasAttention = IslandExpandedRouteResolver.highestPriorityAttentionSession(
+            from: sessions
+        ) != nil
+        let unreadCount = AppSettings.shared.notificationFeedMode
+            ? sessions.filter(\.hasUnread).count
+            : 0
         guard NotchAutoOpenPolicy.shouldArmFeedBannerDismissal(
             feedMode: AppSettings.shared.notificationFeedMode,
             isOpened: viewModel.status == .opened,
             openedByNotification: viewModel.openReason == .notification,
-            hasAttentionSession: hasResolvedAttentionSession,
+            hasAttentionSession: hasAttention,
             hasActiveCompletionCard: activeCompletionNotification != nil,
             isChatContent: isChat,
-            unreadCount: unreadFeedCount
+            unreadCount: unreadCount
         ) else { return }
         scheduleFeedBannerDismissal()
     }
@@ -1519,6 +1561,7 @@ struct NotchView: View {
     }
 
     private func handleFeedBannerHover(_ isHovering: Bool) {
+        isFeedBannerHovered = isHovering
         guard AppSettings.shared.notificationFeedMode,
               viewModel.openReason == .notification else { return }
         if isHovering {

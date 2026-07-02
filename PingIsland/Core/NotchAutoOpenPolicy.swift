@@ -15,6 +15,16 @@ enum NotchAutoOpenPolicy {
         return newPending.contains { $0.needsPromptNotification }
     }
 
+    /// A session's unread flag just turned on while the island is closed:
+    /// feed mode pops the feed as a transient banner (the caller arms the
+    /// banner timer). Session mode never uses this trigger.
+    nonisolated static func shouldOpenFeedBannerForNewUnread(
+        hasNewUnread: Bool,
+        feedMode: Bool
+    ) -> Bool {
+        feedMode && hasNewUnread
+    }
+
     /// A `.notification`-opened panel is sitting on the FEED route (not an
     /// attention card, not the completion card, not chat). Such a panel is a
     /// transient banner: it must self-dismiss after the banner interval.
