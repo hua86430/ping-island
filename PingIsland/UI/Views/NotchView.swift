@@ -1055,7 +1055,10 @@ struct NotchView: View {
            !shouldSuppressAutoOpen {
             Self.presentationLogger.debug("pendingChange -> notchOpen(.notification)")
             viewModel.notchOpen(reason: .notification)
-            armFeedBannerDismissalIfNeeded(instances: sessions)
+            // sessionMonitor.instances is already fresh here: the monitor
+            // publishes `instances` before `pendingInstances`, and `sessions`
+            // is only the pending subset (wrong population for unread counts).
+            armFeedBannerDismissalIfNeeded()
         }
 
         previousPendingIds = currentIds
@@ -1350,7 +1353,11 @@ struct NotchView: View {
             if let latest = sessionsById[active.session.stableId] {
                 activeCompletionNotification?.session = latest
             } else {
-                dismissActiveCompletionNotification(closePanel: false, advanceQueue: true)
+                dismissActiveCompletionNotification(
+                    closePanel: false,
+                    advanceQueue: true,
+                    freshInstances: instances
+                )
             }
         }
 
@@ -1481,7 +1488,8 @@ struct NotchView: View {
 
     private func dismissActiveCompletionNotification(
         closePanel: Bool,
-        advanceQueue: Bool
+        advanceQueue: Bool,
+        freshInstances: [SessionState]? = nil
     ) {
         completionNotificationDismissWorkItem?.cancel()
         completionNotificationDismissWorkItem = nil
@@ -1513,7 +1521,10 @@ struct NotchView: View {
             }
         }
 
-        armFeedBannerDismissalIfNeeded()
+        // freshInstances matters when this runs inside a $instances willSet
+        // handler (synchronizeCompletionNotifications path), where the
+        // monitor's property still holds the stale array.
+        armFeedBannerDismissalIfNeeded(instances: freshInstances)
     }
 
     private var hasResolvedAttentionSession: Bool {
