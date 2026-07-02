@@ -20,6 +20,7 @@ class WindowManager {
     private var lastMigrationTime: Date = .distantPast
     private var pendingMigrationScreenID: CGDirectDisplayID?
     private var pendingMigrationSince: Date?
+    private var dwellWorkItem: DispatchWorkItem?
     private static let cursorFollowDwell: TimeInterval = 0.2
 
     init() {
@@ -121,15 +122,36 @@ class WindowManager {
                 == selector.selectedScreen.flatMap({ selector.screenID(of: $0) }) {
                 pendingMigrationScreenID = nil
                 pendingMigrationSince = nil
+                cancelDwellCheck()
             }
         case .beginDwell(let id):
             pendingMigrationScreenID = id
             pendingMigrationSince = Date()
+            scheduleDwellCheck()
         case .migrate:
             pendingMigrationScreenID = nil
             pendingMigrationSince = nil
+            cancelDwellCheck()
             if let target = cursorScreen { migrate(to: target) }
         }
+    }
+
+    // The dwell check runs inside the mouseLocation handler, so a cursor that
+    // stops on the new screen (no further mouseMoved events) would never satisfy
+    // the elapsed-dwell branch. Fire a one-shot timer to re-evaluate at the
+    // current cursor position once the dwell has passed.
+    private func scheduleDwellCheck() {
+        dwellWorkItem?.cancel()
+        let item = DispatchWorkItem { [weak self] in
+            self?.handleCursorMovement(NSEvent.mouseLocation)
+        }
+        dwellWorkItem = item
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.cursorFollowDwell + 0.03, execute: item)
+    }
+
+    private func cancelDwellCheck() {
+        dwellWorkItem?.cancel()
+        dwellWorkItem = nil
     }
 
     /// Cheap migration: reposition the existing notch window, no rebuild.

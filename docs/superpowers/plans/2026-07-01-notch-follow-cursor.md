@@ -459,3 +459,19 @@ git commit -m "feat: follow cursor across screens without rebuilding the notch"
 - Specific-screen mode never migrates on cursor movement.
 - Low-power still migrates on focus change.
 - All new unit tests + full `PingIslandTests` pass; app builds.
+
+---
+
+## Amendment (2026-07-03): dwell fires without a trailing event
+
+Runtime testing after execution found the migration felt laggy: `handleCursorMovement`
+runs only from the `mouseLocation` sink, so after a `beginDwell` the `.migrate` branch
+could only fire when the *next* `mouseMoved` arrived past the dwell. A cursor that stops
+on the new screen emits no further events, so it migrated only on the next stray event.
+
+Fix (in `WindowManager`): a `beginDwell` result schedules a one-shot main-queue timer
+(`DispatchWorkItem`, `cursorFollowDwell + 0.03` padding) that re-runs the evaluation with
+`NSEvent.mouseLocation`. The work item is cancelled/replaced on the `.migrate` branch, on
+the `.none` reset (cursor back on the notch's screen), and whenever a new `beginDwell`
+reschedules. Reuses the pure decider — no new decision logic. Verified at runtime with a
+stationary cursor migrating ~one dwell after arrival.
