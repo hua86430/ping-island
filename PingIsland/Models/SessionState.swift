@@ -437,6 +437,16 @@ struct SessionState: Equatable, Identifiable, Sendable {
         return isLikelyEmptyCodexPlaceholderForUI
     }
 
+    /// Notification-feed exemption: hidden from the primary list ONLY because of
+    /// the 30-minute idle auto-archive — not because it is a Codex helper thread
+    /// or empty placeholder. Unread sessions in this state stay visible while
+    /// notification feed mode is on; helper/placeholder threads never do.
+    nonisolated var isHiddenFromPrimaryUIOnlyByIdle: Bool {
+        shouldAutoArchiveFromPrimaryUI
+            && !isLikelyCodexAuxiliaryThreadForUI
+            && !isLikelyEmptyCodexPlaceholderForUI
+    }
+
     /// Codex may write helper threads for app-side suggestions or selection filters into the
     /// same rollout/app-server surfaces as user sessions. Hide those JSON-only helper threads
     /// from the primary list while keeping real JSON user prompts visible.

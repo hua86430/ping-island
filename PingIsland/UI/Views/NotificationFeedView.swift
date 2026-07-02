@@ -16,32 +16,35 @@ struct NotificationFeedView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text(appLocalized: "新通知")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.white.opacity(0.7))
-                Spacer()
-                if !feed.isEmpty {
-                    Button(AppLocalization.string("清除全部")) {
-                        sessionMonitor.markAllSessionsSeen()
+        // Mirror SessionHoverDashboardView: the whole content lives inside the
+        // ScrollView and reports its height via the opened-panel preference so
+        // the panel grows with the row count instead of clipping the feed.
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(appLocalized: "新通知")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white.opacity(0.7))
+                    Spacer()
+                    if !feed.isEmpty {
+                        Button(AppLocalization.string("清除全部")) {
+                            sessionMonitor.markAllSessionsSeen()
+                        }
+                        .buttonStyle(.plain)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white.opacity(0.55))
                     }
-                    .buttonStyle(.plain)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(.white.opacity(0.55))
                 }
-            }
-            .padding(.horizontal, 12)
-            .padding(.top, 8)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
 
-            if feed.isEmpty {
-                Text(appLocalized: "没有新通知")
-                    .font(.system(size: 12))
-                    .foregroundColor(.white.opacity(0.4))
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 24)
-            } else {
-                ScrollView(.vertical, showsIndicators: false) {
+                if feed.isEmpty {
+                    Text(appLocalized: "没有新通知")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.4))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 24)
+                } else {
                     LazyVStack(spacing: 2) {
                         ForEach(feed) { session in
                             NotificationFeedRow(session: session) {
@@ -51,8 +54,17 @@ struct NotificationFeedView: View {
                     }
                 }
             }
+            .padding(.bottom, 8)
+            .background(
+                GeometryReader { geometry in
+                    Color.clear.preference(
+                        key: OpenedPanelContentHeightPreferenceKey.self,
+                        value: geometry.size.height
+                    )
+                }
+            )
         }
-        .padding(.bottom, 8)
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private func open(_ session: SessionState) {

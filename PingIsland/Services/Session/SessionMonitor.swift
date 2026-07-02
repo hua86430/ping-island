@@ -849,7 +849,7 @@ class SessionMonitor: ObservableObject {
         let visibilityMode = AppSettings.subagentVisibilityMode
         let feedMode = AppSettings.notificationFeedMode
         let primaryVisibleSessions = sessions.filter {
-            (!$0.shouldHideFromPrimaryUI || (feedMode && $0.hasUnread))
+            (!$0.shouldHideFromPrimaryUI || (feedMode && $0.hasUnread && $0.isHiddenFromPrimaryUIOnlyByIdle))
                 && $0.shouldDisplaySubagent(in: visibilityMode)
         }
         let dedupedSessions = Self.deduplicateSameProjectClaudeSessions(from: primaryVisibleSessions)

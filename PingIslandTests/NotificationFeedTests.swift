@@ -83,4 +83,18 @@ final class NotificationFeedTests: XCTestCase {
         let stale = makeSession(id: "stale", lastActivity: old, lastSeenAt: old.addingTimeInterval(-1))
         XCTAssertEqual(NotificationFeedView.feedSessions(from: [stale]).map(\.sessionId), ["stale"])
     }
+
+    func testIdleExemptionOnlyForIdleHiddenSessions() {
+        // Unread + idle (45 min old activity) → hidden only by the idle rule,
+        // so the feed-mode exemption applies.
+        let old = Date(timeIntervalSinceNow: -45 * 60)
+        let idle = makeSession(id: "idle", lastActivity: old, lastSeenAt: old.addingTimeInterval(-1))
+        XCTAssertTrue(idle.shouldHideFromPrimaryUI)
+        XCTAssertTrue(idle.isHiddenFromPrimaryUIOnlyByIdle)
+
+        // Fresh activity → not hidden at all, exemption not applicable.
+        let fresh = makeSession(id: "fresh", lastActivity: Date(), lastSeenAt: Date(timeIntervalSinceNow: -60))
+        XCTAssertFalse(fresh.shouldHideFromPrimaryUI)
+        XCTAssertFalse(fresh.isHiddenFromPrimaryUIOnlyByIdle)
+    }
 }
