@@ -88,6 +88,7 @@ private struct NotificationFeedRow: View {
     let onTap: () -> Void
 
     @ObservedObject private var settings = AppSettings.shared
+    @State private var isHovered = false
 
     private var previewLine: String? {
         // Latest LLM reply, falling back to the prompt preview, then the folder.
@@ -130,16 +131,28 @@ private struct NotificationFeedRow: View {
             .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(Color.white.opacity(0.04))
+                    .fill(Color.white.opacity(isHovered ? 0.10 : 0.04))
                     .overlay(
                         RoundedRectangle(cornerRadius: 14, style: .continuous)
-                            .strokeBorder(Color.white.opacity(0.08), lineWidth: 1)
+                            .strokeBorder(Color.white.opacity(isHovered ? 0.16 : 0.08), lineWidth: 1)
                     )
             )
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 8)
+        .onHover { hovering in
+            isHovered = hovering
+            // `.set()` instead of push/pop: a feed row can be removed while
+            // hovered (list refresh), and push without a matching pop would
+            // leak the pointing-hand cursor.
+            if hovering {
+                NSCursor.pointingHand.set()
+            } else {
+                NSCursor.arrow.set()
+            }
+        }
+        .animation(.easeOut(duration: 0.12), value: isHovered)
     }
 
     @ViewBuilder
