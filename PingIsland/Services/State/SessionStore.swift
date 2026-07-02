@@ -309,6 +309,7 @@ actor SessionStore {
             needsClearReconciliation: existing?.needsClearReconciliation ?? false,
             lastActivity: Date(),
             lastSeenAt: existing?.lastSeenAt ?? Date(),
+            lastNotifiableActivityAt: existing?.lastNotifiableActivityAt,
             createdAt: existing?.createdAt ?? handle.createdAt
         )
 
@@ -667,6 +668,9 @@ actor SessionStore {
 
         if event.event == "Stop" {
             session.subagentState = SubagentState()
+            // The assistant finished a reply: this is the notification-feed
+            // "new notification" signal. User-originated events never bump it.
+            session.lastNotifiableActivityAt = Date()
         }
 
         associateQoderChildSessionIfNeeded(sessionId: sessionId, event: event, session: &session)
@@ -3483,6 +3487,7 @@ actor SessionStore {
         if !shouldPreserveExternalIntervention {
             session.intervention = intervention
         }
+        let previousPhaseBeforeCodexUpsert = session.phase
         if shouldPreserveExternalIntervention {
             if let hookPermissionPhase = restoredCodexHookPermissionPhase(from: session.intervention) {
                 session.phase = hookPermissionPhase
@@ -3507,6 +3512,11 @@ actor SessionStore {
             session.phase = phase
         } else {
             session.phase = phase
+        }
+        if previousPhaseBeforeCodexUpsert == .processing && session.phase == .idle {
+            // A Codex turn just finished: assistant output landed, so this is
+            // the notification-feed signal (mirrors the hook-family Stop bump).
+            session.lastNotifiableActivityAt = Date()
         }
         let hasIntervention: Bool
         if case .some = session.intervention {
@@ -4548,6 +4558,7 @@ actor SessionStore {
             needsClearReconciliation: previousSession.needsClearReconciliation,
             lastActivity: previousSession.lastActivity,
             lastSeenAt: previousSession.lastSeenAt,
+            lastNotifiableActivityAt: previousSession.lastNotifiableActivityAt,
             createdAt: previousSession.createdAt
         )
 

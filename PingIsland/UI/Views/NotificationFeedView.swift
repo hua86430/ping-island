@@ -8,7 +8,10 @@ struct NotificationFeedView: View {
     nonisolated static func feedSessions(from sessions: [SessionState]) -> [SessionState] {
         sessions
             .filter(\.hasUnread)
-            .sorted { $0.lastActivity > $1.lastActivity }
+            .sorted {
+                ($0.lastNotifiableActivityAt ?? $0.lastActivity)
+                    > ($1.lastNotifiableActivityAt ?? $1.lastActivity)
+            }
     }
 
     private var feed: [SessionState] {
@@ -92,7 +95,7 @@ private struct NotificationFeedRow: View {
     }
 
     private var timeLabel: String {
-        SessionPhaseHelpers.timeBadgeLabel(for: session.lastActivity)
+        SessionPhaseHelpers.timeBadgeLabel(for: session.lastNotifiableActivityAt ?? session.lastActivity)
     }
 
     var body: some View {

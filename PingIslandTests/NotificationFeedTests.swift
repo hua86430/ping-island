@@ -9,24 +9,38 @@ final class NotificationFeedTests: XCTestCase {
     private func makeSession(
         id: String = "s1",
         lastActivity: Date,
-        lastSeenAt: Date
+        lastSeenAt: Date,
+        lastNotifiableActivityAt: Date? = nil
     ) -> SessionState {
         SessionState(
             sessionId: id,
             cwd: "/tmp/project",
             lastActivity: lastActivity,
-            lastSeenAt: lastSeenAt
+            lastSeenAt: lastSeenAt,
+            lastNotifiableActivityAt: lastNotifiableActivityAt
         )
     }
 
     func testHasUnreadTruthTable() {
         let base = Date(timeIntervalSince1970: 1_000_000)
-        // activity after seen → unread
-        XCTAssertTrue(makeSession(lastActivity: base.addingTimeInterval(10), lastSeenAt: base).hasUnread)
-        // seen at same instant as activity → read
-        XCTAssertFalse(makeSession(lastActivity: base, lastSeenAt: base).hasUnread)
-        // seen after activity → read
-        XCTAssertFalse(makeSession(lastActivity: base, lastSeenAt: base.addingTimeInterval(10)).hasUnread)
+        // assistant reply after seen → unread
+        XCTAssertTrue(makeSession(
+            lastActivity: base.addingTimeInterval(10),
+            lastSeenAt: base,
+            lastNotifiableActivityAt: base.addingTimeInterval(10)
+        ).hasUnread)
+        // USER-only activity (session start / typing / tool churn bumps
+        // lastActivity but never lastNotifiableActivityAt) → NOT unread
+        XCTAssertFalse(makeSession(
+            lastActivity: base.addingTimeInterval(10),
+            lastSeenAt: base
+        ).hasUnread)
+        // assistant replied, then user saw it → read
+        XCTAssertFalse(makeSession(
+            lastActivity: base,
+            lastSeenAt: base.addingTimeInterval(10),
+            lastNotifiableActivityAt: base
+        ).hasUnread)
     }
 
     func testDefaultLastSeenAtMakesFreshSessionRead() {
@@ -44,7 +58,11 @@ final class NotificationFeedTests: XCTestCase {
         // exposes a test seam; otherwise test the mutation semantics at the
         // SessionState level: verify that setting lastSeenAt = Date() on a
         // session whose lastActivity is in the past flips hasUnread to false.
-        var session = makeSession(lastActivity: Date(timeIntervalSinceNow: -60), lastSeenAt: Date(timeIntervalSinceNow: -120))
+        var session = makeSession(
+            lastActivity: Date(timeIntervalSinceNow: -60),
+            lastSeenAt: Date(timeIntervalSinceNow: -120),
+            lastNotifiableActivityAt: Date(timeIntervalSinceNow: -60)
+        )
         XCTAssertTrue(session.hasUnread)
         session.lastSeenAt = Date()
         XCTAssertFalse(session.hasUnread)
@@ -68,8 +86,8 @@ final class NotificationFeedTests: XCTestCase {
 
     func testFeedSessionsOnlyUnreadNewestFirst() {
         let base = Date(timeIntervalSince1970: 1_000_000)
-        let unreadOld = makeSession(id: "old", lastActivity: base.addingTimeInterval(10), lastSeenAt: base)
-        let unreadNew = makeSession(id: "new", lastActivity: base.addingTimeInterval(100), lastSeenAt: base)
+        let unreadOld = makeSession(id: "old", lastActivity: base.addingTimeInterval(10), lastSeenAt: base, lastNotifiableActivityAt: base.addingTimeInterval(10))
+        let unreadNew = makeSession(id: "new", lastActivity: base.addingTimeInterval(100), lastSeenAt: base, lastNotifiableActivityAt: base.addingTimeInterval(100))
         let read = makeSession(id: "read", lastActivity: base, lastSeenAt: base.addingTimeInterval(1))
 
         let feed = NotificationFeedView.feedSessions(from: [read, unreadOld, unreadNew])
@@ -80,7 +98,7 @@ final class NotificationFeedTests: XCTestCase {
         // Unread exempt from the 30-minute idle hide: an unread session whose
         // lastActivity is 45 minutes old must still be in the feed.
         let old = Date(timeIntervalSinceNow: -45 * 60)
-        let stale = makeSession(id: "stale", lastActivity: old, lastSeenAt: old.addingTimeInterval(-1))
+        let stale = makeSession(id: "stale", lastActivity: old, lastSeenAt: old.addingTimeInterval(-1), lastNotifiableActivityAt: old)
         XCTAssertEqual(NotificationFeedView.feedSessions(from: [stale]).map(\.sessionId), ["stale"])
     }
 

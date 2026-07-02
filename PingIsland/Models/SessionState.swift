@@ -110,6 +110,10 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// In-memory only: defaults to creation time, so sessions restored at app
     /// launch start read and the notification feed starts empty.
     var lastSeenAt: Date
+    /// When the assistant last produced something worth notifying about
+    /// (reply finished / turn completed). User-originated activity
+    /// (SessionStart, typing a prompt, tool churn) must NOT bump this.
+    var lastNotifiableActivityAt: Date?
     var createdAt: Date
 
     // MARK: - Identifiable
@@ -154,6 +158,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         needsClearReconciliation: Bool = false,
         lastActivity: Date = Date(),
         lastSeenAt: Date = Date(),
+        lastNotifiableActivityAt: Date? = nil,
         createdAt: Date = Date()
     ) {
         self.sessionId = sessionId
@@ -188,6 +193,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.needsClearReconciliation = needsClearReconciliation
         self.lastActivity = lastActivity
         self.lastSeenAt = lastSeenAt
+        self.lastNotifiableActivityAt = lastNotifiableActivityAt
         self.createdAt = createdAt
     }
 
@@ -211,7 +217,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
 
     /// True when the session has activity the user has not seen yet.
     nonisolated var hasUnread: Bool {
-        lastActivity > lastSeenAt
+        (lastNotifiableActivityAt ?? .distantPast) > lastSeenAt
     }
 
     /// The active permission context, if any
