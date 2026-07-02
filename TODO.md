@@ -4,6 +4,9 @@
 
 ## 待處理
 
+- [ ] 通知 feed 自動彈開切開（auto-open decoupling）— 實作+live 實測完成，待發版
+  - desc: feed mode 下:開新 session/打字永不彈;提問/審批照彈且留;回覆完成 → 彈 feed banner 5 秒自收（hover 暫停、移開即收、自癒 re-arm）;session mode 逐位元組不變（決策 log 證明）。live 實測抓到並修掉 willSet-stale arming + stuck-open;既有完成卡 presenter 在本機從不 present = 既有謎、另開診斷（feed banner 已補位）。spec `docs/superpowers/specs/2026-07-02-feed-mode-auto-open-design.md`;證據 `.superpowers/sdd/feed-autoopen-selftest-report.md`。
+
 - [x] 通知中心模式（notification feed）— 完成（0.24.12）。live 實測全過（證據 .superpowers/sdd/feed-selftest-report.md：徽章/開島 feed/點列 focus+清除/清除全部/重啟清空/關閉 parity 全部截圖驗證；實測抓到面板高度 bug 已修 67cbd9b）
   - desc: toggle `notificationFeedMode` 預設關。開時展開島只列未讀 session（`hasUnread` = lastActivity > lastSeenAt，記憶體、重啟清空、不受 30 分自動隱藏）、點列 focus 終端＋標已讀、右上清除全部、收合島顯示未讀數。spec `docs/superpowers/specs/2026-07-02-notification-feed-mode-design.md`；commits 6adec30 de0a83d 7542603 73bb8c8 301bdc6；全 suite 綠、各 task review Approved。
 
