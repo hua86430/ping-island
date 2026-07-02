@@ -79,6 +79,10 @@
 "调窄外接显示器上的闭合态刘海宽度；内置刘海屏会保留系统刘海所需的最小宽度。" = "Narrow the closed-notch width on external displays. Built-in notched displays keep the minimum width needed for the system notch.";
 "调窄外接显示器上的闭合态刘海宽度；较窄时会降级为单图标显示，内置刘海屏会保留系统刘海所需的最小宽度。" = "Narrow the closed-notch width on external displays. Very narrow widths fall back to a single icon, while built-in notched displays keep the minimum width needed for the system notch.";
 "调整无展开面板时的刘海宽度；较窄时会降级为单图标显示，不影响点击或 hover 后的展开面板宽度。" = "Adjust the notch width when no expanded panel is showing. Very narrow widths fall back to a single icon and do not affect the panel width after click or hover.";
+"悬停展开延迟" = "Hover expand delay";
+"鼠标悬停到岛展开的等待时间（秒）。默认 0.24。" = "Seconds of hover dwell before the island expands. Default 0.24.";
+"展开动画时长" = "Expand animation duration";
+"岛展开动画的速度（秒，越小越快）。默认 0.42。" = "Speed of the island's expand animation in seconds; smaller is snappier. Default 0.42.";
 "右侧展示内容" = "Right-side content";
 "默认显示会话数量；检测到 Claude Code 或 Codex 的 7d 用量后，可改为展示其中一个客户端的 Token 剩余额度。" = "Show the session count by default. When Claude Code or Codex 7d usage is detected, you can show one client's remaining token quota instead.";
 "会话数量" = "Session count";

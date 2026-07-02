@@ -22,6 +22,8 @@ enum AppSettingsDefaultKeys {
     nonisolated static let analyticsConsentPromptCompleted = "analyticsConsentPromptCompleted"
     static let terminalHandlesAskUserQuestion = "terminalHandlesAskUserQuestion"
     static let notificationFeedMode = "notificationFeedMode"
+    static let notchHoverActivationDelay = "notchHoverActivationDelay"
+    static let notchOpenAnimationDuration = "notchOpenAnimationDuration"
 }
 
 enum AppLanguage: String, CaseIterable, Identifiable {
@@ -976,6 +978,28 @@ final class AppSettingsStore: ObservableObject {
         }
     }
 
+    @Published var notchHoverActivationDelay: Double {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(notchHoverActivationDelay, forKey: AppSettingsDefaultKeys.notchHoverActivationDelay)
+            recordTelemetrySettingChange(
+                key: AppSettingsDefaultKeys.notchHoverActivationDelay,
+                value: notchHoverActivationDelay.description
+            )
+        }
+    }
+
+    @Published var notchOpenAnimationDuration: Double {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(notchOpenAnimationDuration, forKey: AppSettingsDefaultKeys.notchOpenAnimationDuration)
+            recordTelemetrySettingChange(
+                key: AppSettingsDefaultKeys.notchOpenAnimationDuration,
+                value: notchOpenAnimationDuration.description
+            )
+        }
+    }
+
     @Published var autoRoutePromptsToTerminalWhenIdleEnabled: Bool {
         didSet {
             guard !isBootstrapping else { return }
@@ -1598,6 +1622,18 @@ final class AppSettingsStore: ObservableObject {
             exists: persistedKeys.contains(AppSettingsDefaultKeys.notificationFeedMode),
             default: false
         ))
+        _notchHoverActivationDelay = Published(initialValue: Self.doubleValue(
+            from: defaults,
+            key: AppSettingsDefaultKeys.notchHoverActivationDelay,
+            exists: persistedKeys.contains(AppSettingsDefaultKeys.notchHoverActivationDelay),
+            default: 0.24
+        ))
+        _notchOpenAnimationDuration = Published(initialValue: Self.doubleValue(
+            from: defaults,
+            key: AppSettingsDefaultKeys.notchOpenAnimationDuration,
+            exists: persistedKeys.contains(AppSettingsDefaultKeys.notchOpenAnimationDuration),
+            default: 0.42
+        ))
         _autoRoutePromptsToTerminalWhenIdleEnabled = Published(initialValue: Self.boolValue(
             from: defaults,
             key: Keys.autoRoutePromptsToTerminalWhenIdleEnabled,
@@ -1694,6 +1730,16 @@ enum AppSettings {
     static var notificationFeedMode: Bool {
         get { shared.notificationFeedMode }
         set { shared.notificationFeedMode = newValue }
+    }
+
+    static var notchHoverActivationDelay: Double {
+        get { shared.notchHoverActivationDelay }
+        set { shared.notchHoverActivationDelay = newValue }
+    }
+
+    static var notchOpenAnimationDuration: Double {
+        get { shared.notchOpenAnimationDuration }
+        set { shared.notchOpenAnimationDuration = newValue }
     }
 
     static var soundVolume: Double {

@@ -248,7 +248,11 @@ class NotchViewModel: ObservableObject {
         if isDetachmentNarrowingClosedNotch {
             return .linear(duration: detachmentLongPressNarrowAnimationDuration)
         }
-        return .spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
+        return .spring(response: openAnimationDuration, dampingFraction: 0.8, blendDuration: 0)
+    }
+
+    private var openAnimationDuration: Double {
+        min(max(AppSettings.shared.notchOpenAnimationDuration, 0.15), 0.8)
     }
 
     var isDetachmentNarrowingClosedNotch: Bool {
@@ -271,7 +275,6 @@ class NotchViewModel: ObservableObject {
     private var hoverTimer: DispatchWorkItem?
     // Keep hover previews feeling responsive without making incidental cursor
     // passes over the notch expand it too aggressively.
-    private let defaultHoverActivationDelay: TimeInterval = 0.24
     private let fullscreenHoverActivationDelay: TimeInterval = 0.18
     private let fullscreenRevealZoneHeight: CGFloat = 8
     private let fullscreenRevealZoneHorizontalInset: CGFloat = 36
@@ -710,7 +713,8 @@ class NotchViewModel: ObservableObject {
     }
 
     private var hoverActivationDelay: TimeInterval {
-        isFullscreenEdgeRevealActive ? fullscreenHoverActivationDelay : defaultHoverActivationDelay
+        let clamped = min(max(AppSettings.shared.notchHoverActivationDelay, 0), 1)
+        return isFullscreenEdgeRevealActive ? min(clamped, fullscreenHoverActivationDelay) : clamped
     }
 
     var shouldHideWindowPresentation: Bool {

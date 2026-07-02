@@ -2963,6 +2963,24 @@ private struct SettingsPanelContentView: View {
                         format: { "\($0.formatted(.number.precision(.fractionLength(0)))) pt" }
                     )
                     SettingsLineDivider()
+                    SettingsSliderLine(
+                        title: "悬停展开延迟",
+                        subtitle: "鼠标悬停到岛展开的等待时间（秒）。默认 0.24。",
+                        value: $settings.notchHoverActivationDelay,
+                        range: 0.0...1.0,
+                        step: 0.02,
+                        format: { "\($0.formatted(.number.precision(.fractionLength(2)))) s" }
+                    )
+                    SettingsLineDivider()
+                    SettingsSliderLine(
+                        title: "展开动画时长",
+                        subtitle: "岛展开动画的速度（秒，越小越快）。默认 0.42。",
+                        value: $settings.notchOpenAnimationDuration,
+                        range: 0.15...0.8,
+                        step: 0.01,
+                        format: { "\($0.formatted(.number.precision(.fractionLength(2)))) s" }
+                    )
+                    SettingsLineDivider()
                     SettingsInfoLine(
                         title: "右侧展示内容",
                         subtitle: "默认显示会话数量；检测到 Claude Code 或 Codex 的 7d 用量后，可改为展示其中一个客户端的 Token 剩余额度。"

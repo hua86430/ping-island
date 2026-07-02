@@ -346,7 +346,10 @@ struct NotchView: View {
     }
 
     // Animation springs
-    private let openAnimation = Animation.spring(response: 0.42, dampingFraction: 0.8, blendDuration: 0)
+    private var openAnimation: Animation {
+        let clampedDuration = min(max(AppSettings.shared.notchOpenAnimationDuration, 0.15), 0.8)
+        return .spring(response: clampedDuration, dampingFraction: 0.8, blendDuration: 0)
+    }
     private let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
 
     // MARK: - Body
