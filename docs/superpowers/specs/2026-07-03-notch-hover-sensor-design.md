@@ -1,7 +1,7 @@
 # Notch hover sensor: energy-independent hover open/close for the docked notch
 
 Date: 2026-07-03
-Status: approved (design), pending load-bearing spike + implementation plan
+Status: approved (design), load-bearing spike VERIFIED (2026-07-03), pending implementation plan
 Branch: `notch-hover-tracking-area`
 
 Revision note (2026-07-03): revised after a Fable 5 design review. The sensor is
@@ -104,24 +104,26 @@ stateDiagram-v2
     Closed --> Detached: drag-to-detach (local monitor → handleMouseDragged)
 ```
 
-## Load-bearing assumptions (spike BEFORE writing the plan)
+## Load-bearing assumptions — VERIFIED by spike (2026-07-03)
 
-These cannot be derived from the code; verify with a ~30-minute standalone spike
-(a tiny app: a transparent nonactivating panel with an `.activeAlways` tracking
-area and a local mouse-down monitor, while a terminal is frontmost):
+A standalone spike (accessory-policy app, borderless nonactivating panel, content
+alpha 0.01, `.activeAlways` tracking area, local + global mouse-down monitors,
+synthetic mouse events, app not frontmost) confirmed all three:
 
-1. An `.activeAlways` `NSTrackingArea` on a NON-key, background-app,
+1. The `.activeAlways` `NSTrackingArea` on a NON-key, background accessory,
    nonactivating panel fires `mouseEntered`/`mouseExited` while another app is
-   frontmost. (The whole approach rests on this.)
-2. A fully transparent borderless window is not dropped from hit-testing: with
-   `ignoresMouseEvents = false` and content alpha ≈ 0.001, it receives tracking
-   and mouse-down. Confirm whether a near-zero-alpha backing is required.
+   frontmost. Spike: entered=2, exited=2. VERIFIED.
+2. A near-transparent borderless window (content alpha 0.01, `ignoresMouseEvents
+   = false`) is not dropped from hit-testing; it receives tracking and mouse-down.
+   VERIFIED. (Use a near-zero-alpha content fill, not fully clear.)
 3. The local `NSEvent` monitor fires for a `mouseDown` delivered to the
-   nonactivating sensor panel while the app is inactive (so click-open keeps
-   working through the existing handler).
+   nonactivating sensor panel while the app is inactive. Spike: localDown=1,
+   globalDown=0 (own-window clicks go to the local monitor only — single
+   delivery, confirming no forwarding is needed and none must be added). VERIFIED.
 
-If any fails, fall back to a low-frequency `NSEvent.mouseLocation` poll (see
-Rejected alternatives) rather than the sensor.
+The tracking-area approach is viable; no fallback needed. (Fallback, if this had
+failed, was the low-frequency `NSEvent.mouseLocation` poll under Rejected
+alternatives.)
 
 ## Components
 
