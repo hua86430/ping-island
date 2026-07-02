@@ -10,14 +10,31 @@ final class NotificationFeedTests: XCTestCase {
         id: String = "s1",
         lastActivity: Date,
         lastSeenAt: Date,
-        lastNotifiableActivityAt: Date? = nil
+        lastNotifiableActivityAt: Date? = nil,
+        phase: SessionPhase = .idle,
+        intervention: SessionIntervention? = nil
     ) -> SessionState {
         SessionState(
             sessionId: id,
             cwd: "/tmp/project",
+            intervention: intervention,
+            phase: phase,
             lastActivity: lastActivity,
             lastSeenAt: lastSeenAt,
             lastNotifiableActivityAt: lastNotifiableActivityAt
+        )
+    }
+
+    private func questionIntervention() -> SessionIntervention {
+        SessionIntervention(
+            id: "q-1",
+            kind: .question,
+            title: "q",
+            message: "q",
+            options: [],
+            questions: [],
+            supportsSessionScope: false,
+            metadata: [:]
         )
     }
 
@@ -114,5 +131,20 @@ final class NotificationFeedTests: XCTestCase {
         let fresh = makeSession(id: "fresh", lastActivity: Date(), lastSeenAt: Date(timeIntervalSinceNow: -60))
         XCTAssertFalse(fresh.shouldHideFromPrimaryUI)
         XCTAssertFalse(fresh.isHiddenFromPrimaryUIOnlyByIdle)
+    }
+
+    func testAutoOpenPolicyForNewPendingSessions() {
+        let base = Date(timeIntervalSince1970: 1_000_000)
+        let bareReady = makeSession(id: "ready", lastActivity: base, lastSeenAt: base, phase: .waitingForInput)
+        let question = makeSession(id: "q", lastActivity: base, lastSeenAt: base, phase: .waitingForInput, intervention: questionIntervention())
+
+        // Session mode: any new pending opens (today's behavior).
+        XCTAssertTrue(NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(newPending: [bareReady], feedMode: false))
+        XCTAssertFalse(NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(newPending: [], feedMode: false))
+
+        // Feed mode: bare prompt-ready must NOT open; actionable attention must.
+        XCTAssertFalse(NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(newPending: [bareReady], feedMode: true))
+        XCTAssertTrue(NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(newPending: [bareReady, question], feedMode: true))
+        XCTAssertFalse(NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(newPending: [], feedMode: true))
     }
 }

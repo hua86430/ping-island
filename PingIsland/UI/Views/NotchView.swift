@@ -1034,8 +1034,12 @@ struct NotchView: View {
             return
         }
 
-        if !newPendingIds.isEmpty &&
-           viewModel.status == .closed &&
+        let newPendingSessions = sessions.filter { newPendingIds.contains($0.stableId) }
+        if NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(
+            newPending: newPendingSessions,
+            feedMode: AppSettings.shared.notificationFeedMode
+        ),
+           viewModel.status == .closed,
            !shouldSuppressAutoOpen {
             viewModel.notchOpen(reason: .notification)
         }
