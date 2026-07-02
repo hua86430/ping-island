@@ -2,21 +2,25 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the docked notch open/close on hover at all `EnergyGovernor` levels (including idle) via an always-mouse-active hover-sensor window, without breaking menu-bar click-through or stealing keyboard focus.
+**Goal:** Make the docked notch open/close on hover at all `EnergyGovernor` levels (including idle) via an always-mouse-active hover-sensor window, without breaking menu-bar click-through, click-through replay, or keyboard focus.
 
 **Architecture:** A small, near-transparent, nonactivating hover-sensor panel covers only the closed-notch trigger rect; an `NSTrackingArea` (`.mouseEnteredAndExited`, `.activeAlways`) on it drives hover-open (the spike verified this fires while the app is a background accessory). Close-on-leave while open is driven by a second tracking area sized to the actual opened-panel rect. Click-open and drag-to-detach are unchanged — they ride the existing local `NSEvent` monitor. The energy-gated global `.mouseMoved` monitor keeps serving `WindowManager` cursor-follow only.
 
 **Tech Stack:** Swift, AppKit (NSPanel/NSTrackingArea/NSEvent), Combine, XCTest. Spec: `docs/superpowers/specs/2026-07-03-notch-hover-sensor-design.md`.
 
+**Revision note:** revised after a Fable 5 plan review that found four blocking issues (fixed below): sensor update was placed after `updateWindowPresentation`'s hidden-state early return; the opened-close overlay lacked a frame + `hitTest` override; the sensor/close rects were not refreshed on all geometry/size changes; and plan/spec disagreed on the hidden-state sensor. The spec was updated to match the resolved semantics.
+
 ## Global Constraints
 
 - Branch: `notch-hover-tracking-area`. Develop + verify on a local Debug build before merging to main.
 - Commit style: ticket-less Conventional Commits.
-- Do NOT add a sensor-view override for `mouseDown/mouseDragged/mouseUp`: the local `NSEvent` monitor (`EventMonitor.swift:104-115`) already delivers those to `handleMouseDown`; forwarding would double-fire and break the detachment gesture (spike: `globalDown=0`, `localDown=1`).
-- Sensor is hover-only. Click-open / drag-detach / click-outside-to-close stay on the existing monitor path.
-- Sensor window must match `NotchPanel`'s space behavior: `collectionBehavior` and `level` copied from `NotchWindow.swift:42-50`; near-zero-alpha content (alpha ≈ 0.01), `ignoresMouseEvents = false`, `nonactivatingPanel`, `canBecomeKey = false`.
-- Preserve the `458e0a5` focus-theft fix: hover uses reason `.hover`, which is excluded from `NSApp.activate`/`makeKey`.
-- Keep the current feel: `hoverActivationDelay` before opening; `shouldAutoCollapseHoverPreview` rules on close.
+- Sensor is HOVER-ONLY. Do NOT override `mouseDown/mouseDragged/mouseUp` anywhere for it: the local `NSEvent` monitor (`EventMonitor.swift:104-115`) already delivers those to `handleMouseDown`; forwarding would double-fire and break detachment (spike: `globalDown=0`, `localDown=1`).
+- Sensor window: match `NotchPanel` space/level (`NotchWindow.swift:42-50`) — `collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]`, `level = .mainMenu + 3`; `nonactivatingPanel`, `isOpaque = false`, `backgroundColor = .clear`, `hasShadow = false`, `ignoresMouseEvents = false`, `hidesOnDeactivate = false`, `canBecomeKey = false`, near-zero-alpha content (alpha ≈ 0.01) so the window stays in hit-testing.
+- Opened-close overlay: `frame = contentView.bounds`, `autoresizingMask = [.width, .height]`, and `override func hitTest(_:) -> NSView? { nil }` so it never intercepts SwiftUI panel clicks and never breaks `NotchPanel.sendEvent` click-through replay (`NotchWindow.swift:69-79`, which passes through when `contentView.hitTest == nil`). Tracking-area events are dispatched to the owner regardless of `hitTest`.
+- Sensor + close-rect refresh must run on EVERY input that moves the rects. `updateWindowPresentation` early-returns when `shouldHideWindowPresentation` (`NotchWindowController.swift:165-171`), and its Combine sinks currently cover only `$status/$openReason/$isFullscreenEdgeRevealActive/$isFullscreenBrowserHiddenActive/$isIdleAutoHiddenActive/$isQuietBackgroundPresentationActive/$presentationMode` + EnergyGovernor `$mode`. This plan adds sinks for `$geometry`, `$closedWidth` (sensor rect) and `$contentType`, `$openedMeasuredHeight` (opened-close rect), and drives the sensor update BEFORE the early return.
+- Preserve the `458e0a5` focus-theft fix: hover uses reason `.hover`, excluded from `NSApp.activate`/`makeKey`.
+- Keep the feel: `hoverActivationDelay` before opening; `shouldAutoCollapseHoverPreview` rules on close.
+- Hidden-state semantics (matches the spec): sensor is `nil` (ordered out) when detached OR suppress-hidden (`isFullscreenBrowserHiddenActive`, or `isIdleAutoHiddenActive`/`isQuietBackgroundPresentationActive` while not opened) — no invisible click-eater when the notch is deliberately gone. Sensor uses `fullscreenRevealTriggerRect` only for fullscreen edge-reveal (`isFullscreenEdgeRevealActive` while not opened). Otherwise the closed trigger rect.
 
 ---
 
@@ -27,7 +31,7 @@
 - Test: `PingIslandTests/NotchHoverSensorFrameTests.swift`
 
 **Interfaces:**
-- Produces: `enum NotchHoverSensorFrame { static func rect(isDetached: Bool, shouldHideClosed: Bool, closedTriggerRect: CGRect, fullscreenRevealRect: CGRect) -> CGRect? }`. Returns `nil` when detached (no docked sensor); the reveal rect when the closed presentation is hidden (idle/quiet/fullscreen); otherwise the closed trigger rect. This mirrors `NotchViewModel.isPointInHoverTrigger` plus the `presentationMode == .docked` guard in `handleMouseMove`.
+- Produces: `enum NotchHoverSensorFrame { static func rect(isDetached: Bool, isSuppressedHidden: Bool, isFullscreenReveal: Bool, closedTriggerRect: CGRect, fullscreenRevealRect: CGRect) -> CGRect? }`. `nil` when detached or suppress-hidden; reveal rect when fullscreen edge-reveal; otherwise the closed trigger rect.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -42,29 +46,17 @@ final class NotchHoverSensorFrameTests: XCTestCase {
     private let closed = CGRect(x: 620, y: 810, width: 200, height: 40)
     private let reveal = CGRect(x: 560, y: 800, width: 320, height: 60)
 
-    func testDetachedHasNoSensor() {
-        XCTAssertNil(NotchHoverSensorFrame.rect(
-            isDetached: true, shouldHideClosed: false,
-            closedTriggerRect: closed, fullscreenRevealRect: reveal))
+    private func rect(det: Bool = false, sup: Bool = false, rev: Bool = false) -> CGRect? {
+        NotchHoverSensorFrame.rect(isDetached: det, isSuppressedHidden: sup,
+            isFullscreenReveal: rev, closedTriggerRect: closed, fullscreenRevealRect: reveal)
     }
 
-    func testNormalUsesClosedTriggerRect() {
-        XCTAssertEqual(NotchHoverSensorFrame.rect(
-            isDetached: false, shouldHideClosed: false,
-            closedTriggerRect: closed, fullscreenRevealRect: reveal), closed)
-    }
-
-    func testHiddenClosedUsesRevealRect() {
-        XCTAssertEqual(NotchHoverSensorFrame.rect(
-            isDetached: false, shouldHideClosed: true,
-            closedTriggerRect: closed, fullscreenRevealRect: reveal), reveal)
-    }
-
-    func testDetachedWinsOverHidden() {
-        XCTAssertNil(NotchHoverSensorFrame.rect(
-            isDetached: true, shouldHideClosed: true,
-            closedTriggerRect: closed, fullscreenRevealRect: reveal))
-    }
+    func testNormalUsesClosedTriggerRect() { XCTAssertEqual(rect(), closed) }
+    func testDetachedHasNoSensor() { XCTAssertNil(rect(det: true)) }
+    func testSuppressedHiddenHasNoSensor() { XCTAssertNil(rect(sup: true)) }
+    func testFullscreenRevealUsesRevealRect() { XCTAssertEqual(rect(rev: true), reveal) }
+    func testDetachedWinsOverReveal() { XCTAssertNil(rect(det: true, rev: true)) }
+    func testSuppressedWinsOverReveal() { XCTAssertNil(rect(sup: true, rev: true)) }
 }
 ```
 
@@ -81,16 +73,16 @@ Create `PingIsland/Core/NotchHoverSensorFrame.swift`:
 import CoreGraphics
 
 /// Pure selection of the docked notch's hover-sensor frame.
-/// Mirrors NotchViewModel.isPointInHoverTrigger plus the docked-only guard.
 enum NotchHoverSensorFrame {
     static func rect(
         isDetached: Bool,
-        shouldHideClosed: Bool,
+        isSuppressedHidden: Bool,
+        isFullscreenReveal: Bool,
         closedTriggerRect: CGRect,
         fullscreenRevealRect: CGRect
     ) -> CGRect? {
-        if isDetached { return nil }
-        return shouldHideClosed ? fullscreenRevealRect : closedTriggerRect
+        if isDetached || isSuppressedHidden { return nil }
+        return isFullscreenReveal ? fullscreenRevealRect : closedTriggerRect
     }
 }
 ```
@@ -98,7 +90,7 @@ enum NotchHoverSensorFrame {
 - [ ] **Step 4: Run tests to verify they pass**
 
 Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project PingIsland.xcodeproj -scheme PingIsland -configuration Debug CODE_SIGNING_ALLOWED=NO test -only-testing:PingIslandTests/NotchHoverSensorFrameTests`
-Expected: PASS (4 tests).
+Expected: PASS (6 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -109,20 +101,20 @@ git commit -m "feat: add pure hover-sensor frame selector"
 
 ---
 
-### Task 2: Expose hover-trigger rect and sensor rect on NotchViewModel
+### Task 2: Expose hover-trigger rect, sensor rect, opened-panel rect on NotchViewModel
 
 **Files:**
-- Modify: `PingIsland/Core/NotchViewModel.swift` (`isPointInHoverTrigger` at ~753; add computed vars near it)
+- Modify: `PingIsland/Core/NotchViewModel.swift` (`isPointInHoverTrigger` ~753; add computed vars)
 
 **Interfaces:**
 - Consumes: `NotchHoverSensorFrame.rect(...)` (Task 1).
-- Produces: `NotchViewModel.hoverTriggerRect: CGRect` (the rect `isPointInHoverTrigger` tests); `NotchViewModel.hoverSensorRect: CGRect?` (nil when detached, else the trigger rect); `NotchViewModel.openedPanelScreenRect: CGRect` (`geometry.openedScreenRect(for: openedSize)`).
+- Produces: `hoverTriggerRect: CGRect`, `hoverSensorRect: CGRect?`, `openedPanelScreenRect: CGRect`.
 
-This task is a no-behavior-change refactor: it introduces the rects the sensor and the opened close-area consume. Verified by build + existing tests.
+No-behavior-change refactor; verified by build + existing tests.
 
-- [ ] **Step 1: Extract `hoverTriggerRect` and refactor `isPointInHoverTrigger`**
+- [ ] **Step 1: Add rects and refactor `isPointInHoverTrigger`**
 
-Replace `isPointInHoverTrigger` (`:753-758`) and add the sensor/opened rects:
+Replace `isPointInHoverTrigger` (`:753-758`) and add:
 
 ```swift
     var hoverTriggerRect: CGRect {
@@ -137,11 +129,17 @@ Replace `isPointInHoverTrigger` (`:753-758`) and add the sensor/opened rects:
     }
 
     /// Frame for the always-on hover-sensor window; nil when the docked notch
-    /// is not the active presentation (detached).
+    /// is not present (detached or suppress-hidden). Reveal rect only for the
+    /// fullscreen edge-reveal case.
     var hoverSensorRect: CGRect? {
-        NotchHoverSensorFrame.rect(
+        let isRevealActive = isFullscreenEdgeRevealActive && status != .opened
+        let isSuppressed = isFullscreenBrowserHiddenActive
+            || (isIdleAutoHiddenActive && status != .opened)
+            || (isQuietBackgroundPresentationActive && status != .opened)
+        return NotchHoverSensorFrame.rect(
             isDetached: presentationMode != .docked,
-            shouldHideClosed: shouldHideClosedPresentation,
+            isSuppressedHidden: isSuppressed,
+            isFullscreenReveal: isRevealActive,
             closedTriggerRect: closedScreenRect.insetBy(dx: -10, dy: -5),
             fullscreenRevealRect: fullscreenRevealTriggerRect
         )
@@ -153,12 +151,12 @@ Replace `isPointInHoverTrigger` (`:753-758`) and add the sensor/opened rects:
     }
 ```
 
-Note: `isPointInClosedNotch` (`:760-762`) may now be unused; leave it if other callers remain, otherwise delete it. Verify with `rg "isPointInClosedNotch" PingIsland`.
+If `isPointInClosedNotch` (`:760`) becomes unused (`rg "isPointInClosedNotch" PingIsland`), delete it.
 
-- [ ] **Step 2: Verify it builds and existing tests pass**
+- [ ] **Step 2: Verify build + existing tests**
 
 Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project PingIsland.xcodeproj -scheme PingIsland -configuration Debug CODE_SIGNING_ALLOWED=NO test -only-testing:PingIslandTests`
-Expected: `** TEST SUCCEEDED **` (no behavior change; `isPointInHoverTrigger` returns the same values).
+Expected: `** TEST SUCCEEDED **`.
 
 - [ ] **Step 3: Commit**
 
@@ -169,25 +167,29 @@ git commit -m "refactor: expose hoverTriggerRect / hoverSensorRect / openedPanel
 
 ---
 
-### Task 3: Hover-open entry points + isHovering ownership on NotchViewModel
+### Task 3: Hover entry points + isHovering ownership on NotchViewModel
 
 **Files:**
-- Modify: `PingIsland/Core/NotchViewModel.swift` (`handleMouseMove` ~538-574; `setupEventHandlers` ~497-527; `performDeferredHoverOpenIfNeeded` ~827; `hoverTimer`)
+- Modify: `PingIsland/Core/NotchViewModel.swift` (`handleMouseMove` ~538-574; `setupEventHandlers` ~500-505; near `performDeferredHoverOpenIfNeeded` ~827)
 
 **Interfaces:**
-- Produces: `NotchViewModel.hoverSensorEntered()`, `NotchViewModel.hoverSensorExited()`, `NotchViewModel.openedPanelExited()` — called by the sensor window (Task 4) and the opened close-area (Task 5). They own `isHovering` set/clear and the dwell timer, replacing the hover role of `handleMouseMove`.
+- Produces: `hoverSensorEntered()`, `hoverSensorExited()`, `openedPanelExited()`.
 
-Rationale: `handleMouseMove` currently sets/clears `isHovering` and starts the hover dwell from the energy-gated `mouseLocation` stream (`:538-574`). Move that logic to explicit entry points the tracking areas call. Keep `handleMouseDown/Dragged/Up` untouched. Remove the `mouseLocation` subscription so hover no longer depends on `.mouseMoved`.
+Design points from the review:
+- `isHovering` is set true only when transitioning from not-hovering; cleared only on a real exit, NOT on close. This prevents the close-while-cursor-still-inside → auto-reopen loop: after an explicit close the cursor has not left, `isHovering` stays true, and the sensor's re-show (with its synthetic enter, Task 4) is gated out until a real exit+enter.
+- `isHovering` has no UI reader today (verified); it only guards `performDeferredHoverOpenIfNeeded`. Keeping it true after close is safe.
 
-- [ ] **Step 1: Add the hover entry points**
+- [ ] **Step 1: Add entry points**
 
-Add to `NotchViewModel` (near `performDeferredHoverOpenIfNeeded`, ~827):
+Add near `performDeferredHoverOpenIfNeeded` (~827):
 
 ```swift
-    /// Cursor entered the closed-notch hover-sensor rect.
+    /// Cursor entered the closed-notch hover-sensor rect (real or synthetic).
+    /// Idempotent: only starts the dwell on a not-hovering → hovering edge.
     func hoverSensorEntered() {
         guard presentationMode == .docked else { return }
         guard status == .closed || status == .popping else { return }
+        guard !isHovering else { return }
         isHovering = true
         hoverTimer?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
@@ -197,19 +199,19 @@ Add to `NotchViewModel` (near `performDeferredHoverOpenIfNeeded`, ~827):
         DispatchQueue.main.asyncAfter(deadline: .now() + hoverActivationDelay, execute: workItem)
     }
 
-    /// Cursor left the closed-notch hover-sensor rect before opening.
+    /// Cursor left the closed-notch hover-sensor rect.
     func hoverSensorExited() {
         hoverTimer?.cancel()
         hoverTimer = nil
-        if status == .closed || status == .popping {
-            isHovering = false
-        }
+        isHovering = false
     }
 
     /// Cursor left the opened panel rect.
     func openedPanelExited() {
         guard presentationMode == .docked else { return }
         guard status == .opened else { return }
+        // Backstop against a stale tracking rect: re-check the current panel rect.
+        if openedPanelScreenRect.contains(NSEvent.mouseLocation) { return }
         isHovering = false
         if Self.shouldAutoCollapseHoverPreview(
             isHovering: false,
@@ -224,16 +226,14 @@ Add to `NotchViewModel` (near `performDeferredHoverOpenIfNeeded`, ~827):
     }
 ```
 
-- [ ] **Step 2: Remove the hover role from the mouseLocation stream**
+- [ ] **Step 2: Remove the mouseLocation hover subscription + handleMouseMove**
 
-In `setupEventHandlers` (`:500-505`), delete the `events.mouseLocation` subscription block (the sink that calls `handleMouseMove`). Then delete `handleMouseMove` (`:538-574`). Leave `mouseDown`/`mouseDragged`/`mouseUp` subscriptions intact.
+In `setupEventHandlers` (`:500-505`), delete the `events.mouseLocation` sink that calls `handleMouseMove`. Delete `handleMouseMove` (`:538-574`). Keep `mouseDown/mouseDragged/mouseUp` subscriptions. Verify: `rg "handleMouseMove" PingIsland` returns nothing.
 
-Verify no other caller: `rg "handleMouseMove" PingIsland` should return nothing after deletion.
-
-- [ ] **Step 3: Verify it builds**
+- [ ] **Step 3: Verify build**
 
 Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project PingIsland.xcodeproj -scheme PingIsland -configuration Debug CODE_SIGNING_ALLOWED=NO build`
-Expected: BUILD SUCCEEDED. (Hover is temporarily inert until Tasks 4-5 wire the sensor; click-open still works.)
+Expected: BUILD SUCCEEDED. (Hover is inert until Tasks 4-5 wire the sensor and close area; click-open still works. This is an expected intermediate state — do not treat inert hover as a bug during Task 3/4 verification.)
 
 - [ ] **Step 4: Run the suite**
 
@@ -244,20 +244,20 @@ Expected: `** TEST SUCCEEDED **`.
 
 ```bash
 git add PingIsland/Core/NotchViewModel.swift
-git commit -m "refactor: move hover open/close to explicit entry points, drop mouseMoved hover"
+git commit -m "refactor: hover open/close via explicit entry points, drop mouseMoved hover"
 ```
 
 ---
 
-### Task 4: NotchHoverSensorWindow + wire it for hover-open
+### Task 4: NotchHoverSensorWindow + wire hover-open (with full refresh coverage)
 
 **Files:**
 - Create: `PingIsland/UI/Window/NotchHoverSensorWindow.swift`
-- Modify: `PingIsland/UI/Window/NotchWindowController.swift` (own the sensor in `updateWindowPresentation` ~162; reposition in `moveToScreen`)
+- Modify: `PingIsland/UI/Window/NotchWindowController.swift` (add sink subscriptions; drive sensor in `updateWindowPresentation` before the early return)
 
 **Interfaces:**
-- Consumes: `NotchViewModel.hoverSensorEntered()/hoverSensorExited()` (Task 3), `NotchViewModel.hoverSensorRect` (Task 2).
-- Produces: `NotchHoverSensorWindow(onEnter:onExit:)`; `func update(rect: CGRect?)` (shows + frames when non-nil, orders out when nil, and hit-tests the current cursor to fire `onEnter` when the cursor is already inside a freshly shown/moved rect).
+- Consumes: `hoverSensorEntered()/hoverSensorExited()` (Task 3), `hoverSensorRect` (Task 2).
+- Produces: `NotchHoverSensorWindow(onEnter:onExit:)`; `func update(rect: CGRect?)`.
 
 - [ ] **Step 1: Create the sensor window**
 
@@ -266,9 +266,9 @@ Create `PingIsland/UI/Window/NotchHoverSensorWindow.swift`:
 ```swift
 import AppKit
 
-/// A near-transparent, nonactivating panel over the closed-notch trigger rect.
-/// Its tracking area fires enter/exit even when the app is a background
-/// accessory (verified by spike), so hover works at all energy levels.
+/// Near-transparent, nonactivating panel over the closed-notch trigger rect.
+/// Its .activeAlways tracking area fires enter/exit even when the app is a
+/// background accessory (verified by spike), so hover works at all energy levels.
 final class NotchHoverSensorWindow: NSPanel {
     private let sensorView: SensorView
 
@@ -277,15 +277,14 @@ final class NotchHoverSensorWindow: NSPanel {
         super.init(
             contentRect: NSRect(x: 0, y: 0, width: 10, height: 10),
             styleMask: [.borderless, .nonactivatingPanel],
-            backing: .buffered,
-            defer: false
+            backing: .buffered, defer: false
         )
         isFloatingPanel = true
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
         ignoresMouseEvents = false
-        // Match NotchPanel space/level behavior (NotchWindow.swift:42-50).
+        hidesOnDeactivate = false
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
         level = .mainMenu + 3
         sensorView.onEnter = onEnter
@@ -296,9 +295,11 @@ final class NotchHoverSensorWindow: NSPanel {
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 
-    /// Show + frame the sensor for `rect`, or order out when nil. Fires onEnter
-    /// if the cursor is already inside (AppKit does not emit mouseEntered for a
-    /// cursor already within a freshly installed/moved tracking area).
+    /// Show + frame for `rect`, or order out when nil. Fires onEnter if the
+    /// cursor is already inside (AppKit emits no mouseEntered for a cursor
+    /// already within a freshly installed/moved tracking area). onEnter is
+    /// itself idempotent (guarded by !isHovering in the view model), so a
+    /// re-show under a stationary cursor after a close does not reopen.
     func update(rect: CGRect?) {
         guard let rect else {
             if isVisible { orderOut(nil) }
@@ -314,74 +315,81 @@ final class NotchHoverSensorWindow: NSPanel {
     private final class SensorView: NSView {
         var onEnter: () -> Void = {}
         var onExit: () -> Void = {}
-
         override init(frame: NSRect) {
             super.init(frame: frame)
             wantsLayer = true
-            // Near-zero alpha keeps the window in hit-testing (spike finding).
             layer?.backgroundColor = NSColor.black.withAlphaComponent(0.01).cgColor
         }
-
         required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
-
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
             trackingAreas.forEach(removeTrackingArea)
-            addTrackingArea(NSTrackingArea(
-                rect: bounds,
-                options: [.mouseEnteredAndExited, .activeAlways],
-                owner: self,
-                userInfo: nil
-            ))
+            addTrackingArea(NSTrackingArea(rect: bounds,
+                options: [.mouseEnteredAndExited, .activeAlways], owner: self, userInfo: nil))
         }
-
         override func mouseEntered(with event: NSEvent) { onEnter() }
         override func mouseExited(with event: NSEvent) { onExit() }
     }
 }
 ```
 
-- [ ] **Step 2: Own the sensor from NotchWindowController**
+- [ ] **Step 2: Own the sensor + add refresh sinks in NotchWindowController**
 
-In `NotchWindowController.swift`, add a stored property and create the sensor in `init` (after the notch window is set up), wiring it to the viewModel:
-
-```swift
-    private lazy var hoverSensor = NotchHoverSensorWindow(
-        onEnter: { [weak viewModel] in viewModel?.hoverSensorEntered() },
-        onExit: { [weak viewModel] in viewModel?.hoverSensorExited() }
-    )
-```
-
-(`viewModel` is already a stored `let` on the controller.) At the end of `updateWindowPresentation(window:viewModel:)` (~191), drive the sensor from the viewModel's current rect:
+Add a stored property (created in `init`, after the notch window exists, using the controller's `viewModel`):
 
 ```swift
-        hoverSensor.update(rect: viewModel.hoverSensorRect)
+    private let hoverSensor: NotchHoverSensorWindow
 ```
 
-Because `updateWindowPresentation` is already the sink for `$status`, `$openReason`, `$isFullscreenEdgeRevealActive` and is called on geometry changes, the sensor re-frames on every relevant state change. When opened, `hoverSensorRect` is still the trigger rect — order the sensor out while opened to avoid overlap: change the line to
+In `init`, before the sink setup:
+
+```swift
+        hoverSensor = NotchHoverSensorWindow(
+            onEnter: { [weak viewModel] in viewModel?.hoverSensorEntered() },
+            onExit: { [weak viewModel] in viewModel?.hoverSensorExited() }
+        )
+```
+
+(Order stored-property init before `super.init` per Swift rules; if `viewModel` is needed in the closure, assign the closures after `super.init` via a small setter, or capture `self` weakly and read `self.viewModel`. Simplest: give the window settable `onEnter/onExit` and wire them right after `super.init`.)
+
+Add refresh sinks alongside the existing `$status`/`$openReason` sinks (~65-87), so the sensor re-frames on geometry and width changes too:
+
+```swift
+        viewModel.$geometry
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak notchWindow, weak viewModel] _ in
+                guard let self, let notchWindow, let viewModel else { return }
+                self.updateWindowPresentation(window: notchWindow, viewModel: viewModel)
+            }
+            .store(in: &cancellables)
+
+        viewModel.$closedWidth
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak notchWindow, weak viewModel] _ in
+                guard let self, let notchWindow, let viewModel else { return }
+                self.updateWindowPresentation(window: notchWindow, viewModel: viewModel)
+            }
+            .store(in: &cancellables)
+```
+
+- [ ] **Step 3: Drive the sensor BEFORE the early return**
+
+In `updateWindowPresentation(window:viewModel:)`, at the very TOP (before the `shouldHideWindow` early-return block ~163-171), add:
 
 ```swift
         hoverSensor.update(rect: viewModel.status == .opened ? nil : viewModel.hoverSensorRect)
 ```
 
-- [ ] **Step 3: Reposition the sensor on screen migration**
+This runs for hidden states too, so the sensor orders out when suppress-hidden (`hoverSensorRect == nil`) and re-frames to the reveal rect in fullscreen edge-reveal. The `moveToScreen` migration path needs no extra sensor call: `IslandPresentationCoordinator.updateScreen` updates `geometry`, which fires the `$geometry` sink → `updateWindowPresentation` → sensor refresh, covering both a screen change and a menu-bar-height-only change (where `moveToScreen` early-returns).
 
-In `moveToScreen(_:)` (added by the cursor-follow work), after `window?.setFrame(...)`, refresh the sensor so it follows to the new screen:
-
-```swift
-        hoverSensor.update(rect: viewModel.status == .opened ? nil : viewModel.hoverSensorRect)
-```
-
-(`viewModel.hoverSensorRect` recomputes from the new screen geometry once `updateScreenGeometry` has run in the same `updateScreen` call.)
-
-- [ ] **Step 4: Verify it builds**
+- [ ] **Step 4: Verify build**
 
 Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project PingIsland.xcodeproj -scheme PingIsland -configuration Debug CODE_SIGNING_ALLOWED=NO build`
 Expected: BUILD SUCCEEDED.
 
-- [ ] **Step 5: Runtime-verify hover-open works while idle**
+- [ ] **Step 5: Runtime-verify hover-open while idle**
 
-Build + relaunch the Debug app (kill any stale instance; confirm the new process start time is later than the binary mtime). With NO active session (mode `interactionOnly`, so `.mouseMoved` is off), move the cursor over the closed notch and leave it: the notch should open after ~`hoverActivationDelay`. Move away before the delay: it should not open. Confirm a menu-bar item beside the notch still clicks, and hover-open does not steal keyboard focus from a terminal.
+Kill any stale instance; build + relaunch Debug; confirm process start > binary mtime. With NO active session (`interactionOnly`): hover over the closed notch → opens after ~`hoverActivationDelay`; move away before the delay → does not open. Confirm a menu-bar item beside the notch still clicks; hover-open does not steal terminal keyboard focus. Migrate to another screen (cursor-follow) → hover opens on the new screen, including when the cursor is already sitting on the new-screen notch.
 
 - [ ] **Step 6: Commit**
 
@@ -395,66 +403,96 @@ git commit -m "feat: hover-sensor window drives idle-independent notch hover-ope
 ### Task 5: Opened-panel close tracking area
 
 **Files:**
-- Modify: `PingIsland/UI/Window/NotchWindowController.swift` (opened window content view; `updateWindowPresentation`)
+- Modify: `PingIsland/UI/Window/NotchWindowController.swift` (add overlay + close-rect sinks; set rect in `updateWindowPresentation`)
 
 **Interfaces:**
-- Consumes: `NotchViewModel.openedPanelExited()` (Task 3), `NotchViewModel.openedPanelScreenRect` (Task 2).
-- Produces: a tracking area on the notch window's content view, sized to the opened panel rect (converted to view coordinates), installed while `status == .opened` and rebuilt when the panel size changes; `mouseExited` → `viewModel.openedPanelExited()`.
+- Consumes: `openedPanelExited()` (Task 3), `openedPanelScreenRect` (Task 2).
+- Produces: an `OpenedCloseTrackingView` subview of the notch window content view.
 
-Rationale (spec Finding 2): the notch window is full-screen-width × 750pt, so a content-view-bounds tracking area only fires when leaving the whole top strip. The close area must equal the actual panel rect (`openedPanelScreenRect`) converted to the window's content-view coordinates.
+- [ ] **Step 1: Add the overlay tracking view**
 
-- [ ] **Step 1: Add an opened-close tracking view**
-
-Give the notch window content view (or a dedicated overlay subview) a tracking area covering the opened panel rect. Implement a small `NSView` subclass owned by `NotchWindowController` that installs the area from a settable `panelRectInView: CGRect` and calls a closure on `mouseExited`:
+Add this subclass in `NotchWindowController.swift`:
 
 ```swift
     private final class OpenedCloseTrackingView: NSView {
-        var panelRectInView: CGRect = .zero { didSet { needsUpdateTrackingAreas() } }
+        var panelRectInView: CGRect = .zero { didSet { updateTrackingAreas() } }
         var onExit: () -> Void = {}
-        private func needsUpdateTrackingAreas() { updateTrackingAreas() }
+        override func hitTest(_ point: NSPoint) -> NSView? { nil } // transparent to clicks + click-through replay
         override func updateTrackingAreas() {
             super.updateTrackingAreas()
             trackingAreas.forEach(removeTrackingArea)
             guard !panelRectInView.isEmpty else { return }
-            addTrackingArea(NSTrackingArea(
-                rect: panelRectInView,
-                options: [.mouseEnteredAndExited, .activeAlways],
-                owner: self, userInfo: nil))
+            addTrackingArea(NSTrackingArea(rect: panelRectInView,
+                options: [.mouseEnteredAndExited, .activeAlways], owner: self, userInfo: nil))
         }
         override func mouseExited(with event: NSEvent) { onExit() }
     }
 ```
 
-Wire an instance onto the opened window. In `updateWindowPresentation`, when `status == .opened`, set its `panelRectInView` to `viewModel.openedPanelScreenRect` converted from screen to the window's content-view space:
+Attach one instance to the window content view in `init` (after `contentViewController` is set), full-size and auto-resizing:
 
 ```swift
-        if viewModel.status == .opened, let window = self.window {
+        if let contentView = notchWindow.contentView {
+            openedCloseTracking.frame = contentView.bounds
+            openedCloseTracking.autoresizingMask = [.width, .height]
+            openedCloseTracking.onExit = { [weak viewModel] in viewModel?.openedPanelExited() }
+            contentView.addSubview(openedCloseTracking)
+        }
+```
+
+with `private let openedCloseTracking = OpenedCloseTrackingView()`.
+
+- [ ] **Step 2: Set the close rect + add resize sinks**
+
+In `updateWindowPresentation`, after the sensor line (Step 4-3), maintain the close rect:
+
+```swift
+        if viewModel.status == .opened, let contentView = window.contentView {
             let screenRect = viewModel.openedPanelScreenRect
             let rectInWindow = window.convertFromScreen(screenRect)
-            openedCloseTracking.panelRectInView = window.contentView?.convert(rectInWindow, from: nil) ?? .zero
-            openedCloseTracking.onExit = { [weak viewModel] in viewModel?.openedPanelExited() }
+            openedCloseTracking.panelRectInView = contentView.convert(rectInWindow, from: nil)
         } else {
             openedCloseTracking.panelRectInView = .zero
         }
 ```
 
-(Attach `openedCloseTracking` as a subview of the window's content view once, in `init`.)
+Note: this block sits AFTER the early return, which is fine — the close rect only matters while `.opened` (never a hidden state). Add sinks so the rect follows panel resize:
 
-- [ ] **Step 2: Verify it builds**
+```swift
+        viewModel.$contentType
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak notchWindow, weak viewModel] _ in
+                guard let self, let notchWindow, let viewModel else { return }
+                self.updateWindowPresentation(window: notchWindow, viewModel: viewModel)
+            }
+            .store(in: &cancellables)
+
+        viewModel.$openedMeasuredHeight
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self, weak notchWindow, weak viewModel] _ in
+                guard let self, let notchWindow, let viewModel else { return }
+                self.updateWindowPresentation(window: notchWindow, viewModel: viewModel)
+            }
+            .store(in: &cancellables)
+```
+
+(The `openedPanelExited()` backstop from Task 3 re-checks the live rect, so a one-frame-stale rect never mis-closes.)
+
+- [ ] **Step 3: Verify build**
 
 Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project PingIsland.xcodeproj -scheme PingIsland -configuration Debug CODE_SIGNING_ALLOWED=NO build`
 Expected: BUILD SUCCEEDED.
 
-- [ ] **Step 3: Runtime-verify close-on-leave works while idle**
+- [ ] **Step 4: Runtime-verify close-on-leave while idle**
 
-With no active session, hover-open the notch (Task 4), then move the cursor off the panel: it should close (respecting the auto-collapse rules — it should NOT close if a settings popover or inline text input is active). Resize-triggering content (e.g. a longer session list) should still close correctly at the panel edge, not at the screen edge.
+With no active session, hover-open the notch, then move off the panel → it closes. It should NOT close while a settings popover or inline text input is active. Open a taller panel (longer session list / switch content) and confirm it closes at the panel edge, not the screen edge. Clicking a button inside the opened panel still works (overlay `hitTest` is nil).
 
-- [ ] **Step 4: Run the suite**
+- [ ] **Step 5: Run the suite**
 
 Run: `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -project PingIsland.xcodeproj -scheme PingIsland -configuration Debug CODE_SIGNING_ALLOWED=NO test -only-testing:PingIslandTests`
 Expected: `** TEST SUCCEEDED **`.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add PingIsland/UI/Window/NotchWindowController.swift
@@ -466,24 +504,26 @@ git commit -m "feat: close docked notch on leaving the opened panel rect (energy
 ### Task 6: Full runtime verification + docs
 
 **Files:**
-- Modify: `AGENTS.md` (notch sizing/visibility bullet — record the hover-sensor mechanism)
+- Modify: `AGENTS.md` (notch sizing/visibility bullet)
 
 - [ ] **Step 1: End-to-end runtime verification (jack-loop)**
 
-On the Debug build, with NO active session (idle), verify against the spec success criteria:
-1. Hover over the closed notch opens it (~`hoverActivationDelay`); moving away closes it.
-2. A menu-bar item beside the notch still clicks (click-through preserved).
+On the Debug build, idle (no active session), verify the spec success criteria:
+1. Hover opens the closed notch (~`hoverActivationDelay`); leaving closes it.
+2. Menu-bar item beside the notch still clicks (click-through preserved).
 3. Closed-notch click-open and drag-to-detach still work.
-4. Migrate the notch to another screen (cursor-follow) and confirm hover opens on the new screen, including when the cursor is already sitting on the new-screen notch (the `update(rect:)` hit-test path).
-5. Hover-open does not steal keyboard focus from a terminal.
-6. If an external screen has a crowded menu bar, confirm the sensor rect does not swallow a needed status item / app-menu click (spec Finding 5); if it does, narrow the sensor rect to `closedScreenRect` (drop the `-10` inset) in `hoverSensorRect` and re-verify.
+4. Screen migration (cursor-follow): hover works on the new screen, including cursor-already-there.
+5. Hover-open does not steal terminal keyboard focus.
+6. Close-then-reopen loop is absent: click/Esc-close while the cursor stays on the notch does NOT auto-reopen; you must leave and re-enter.
+7. Suppress-hidden states: when the notch is idle-auto-hidden / quiet-background, a click on the top-center area is NOT swallowed (sensor is `nil` there).
+8. External screen with a crowded menu bar: the sensor rect does not swallow a needed status-item / app-menu click; if it does, narrow `hoverSensorRect`'s closed rect to `closedScreenRect` (drop the `-10` inset) and re-verify.
 
 - [ ] **Step 2: Update AGENTS.md**
 
 Under the notch sizing/visibility change-routing bullet, add:
 
 ```markdown
-  - Docked-notch hover open/close is driven by `NotchHoverSensorWindow` (a nonactivating near-transparent panel over the trigger rect with an `.activeAlways` NSTrackingArea) plus an opened-panel-rect tracking area in `NotchWindowController`, not by the energy-gated global `.mouseMoved` monitor — so hover works when the app is idle. Click-open and drag-detach still ride the local `NSEvent` monitor into `handleMouseDown`. Trace `NotchHoverSensorFrame`, `NotchViewModel.hoverSensorRect/openedPanelScreenRect`, and `NotchWindowController.updateWindowPresentation` together when changing hover.
+  - Docked-notch hover open/close is driven by `NotchHoverSensorWindow` (a nonactivating near-transparent panel over the trigger rect with an `.activeAlways` NSTrackingArea) plus an opened-panel-rect `OpenedCloseTrackingView` in `NotchWindowController`, not by the energy-gated global `.mouseMoved` monitor — so hover works when the app is idle. Click-open and drag-detach still ride the local `NSEvent` monitor into `handleMouseDown`. The sensor rect is `NotchViewModel.hoverSensorRect` (nil when detached/suppress-hidden, reveal rect in fullscreen edge-reveal), refreshed from `updateWindowPresentation` via `$status/$openReason/$geometry/$closedWidth/...` sinks. Trace `NotchHoverSensorFrame`, `NotchViewModel.hoverSensorRect/openedPanelScreenRect`, and `NotchWindowController.updateWindowPresentation` together when changing hover.
 ```
 
 - [ ] **Step 3: Full suite + build**
@@ -502,28 +542,16 @@ git commit -m "docs: record notch hover-sensor mechanism in AGENTS.md"
 
 ## Self-Review
 
-**Spec coverage:**
-- Hover-only sensor window + tracking area → Task 4. Spec "Approach", "Components".
-- Click/drag unchanged via local monitor → Global Constraints + Task 3 keeps `handleMouseDown` untouched. Spec Finding 1.
-- Opened-panel-rect close (not full window) → Task 5. Spec Finding 2.
-- Cursor-already-inside hit-test → Task 4 `update(rect:)`. Spec Finding 4.
-- isHovering ownership → Task 3 entry points. Spec Finding 6.
-- Lifecycle in `updateWindowPresentation` → Tasks 4-5. Spec Finding 7.
-- Window properties (collectionBehavior/level/near-zero alpha) → Task 4. Spec Finding 3.
-- Migration sync → Task 4 Step 3. Spec edge cases.
-- Fullscreen reveal rect → Task 2 `hoverTriggerRect` / `hoverSensorRect`. Spec geometry contract.
-- Click-consume external-screen risk → Task 6 Step 1.6 verification. Spec Finding 5.
-- Focus-theft preserved → Global Constraints (reason `.hover`). Spec goal.
-- Frame selector unit test → Task 1.
+**Spec coverage:** hover-only sensor (Task 4); click/drag via local monitor unchanged (Constraints + Task 3); opened-panel-rect close, not full window (Task 5, Finding 2); cursor-already-inside hit-test (Task 4 `update`, Finding 4); isHovering ownership + no-reopen gate (Task 3, Findings 5/6); lifecycle before early-return + full sink coverage (Tasks 4-5, Findings 1/3); window properties incl. hidesOnDeactivate + near-zero alpha (Task 4, Finding 3); overlay hitTest→nil protecting click-through replay (Task 5, Finding 2); hidden-state semantics aligned with spec (Constraints + Task 2, Finding 4); migration via $geometry sink (Task 4); click-consume verification (Task 6.1.7-8, Finding 5); focus-theft preserved (Constraints); frame selector unit test (Task 1).
 
-**Placeholder scan:** none. AppKit-integration tasks (3-5) verify via build + runtime because only the frame selector is unit-testable without a live window; the spike already de-risked the tracking-area mechanism. Runtime steps state exact conditions and expected behavior.
+**Placeholder scan:** none. AppKit-integration tasks (3-5) verify via build + runtime because only the frame selector is unit-testable without a live window; the spike de-risked the mechanism. Runtime steps state exact conditions + expected behavior.
 
-**Type consistency:** `hoverSensorRect: CGRect?`, `hoverTriggerRect: CGRect`, `openedPanelScreenRect: CGRect`, `hoverSensorEntered()/hoverSensorExited()/openedPanelExited()`, `NotchHoverSensorWindow(onEnter:onExit:)` + `update(rect:)`, `NotchHoverSensorFrame.rect(isDetached:shouldHideClosed:closedTriggerRect:fullscreenRevealRect:)` are used identically across tasks.
+**Type consistency:** `hoverSensorRect: CGRect?`, `hoverTriggerRect: CGRect`, `openedPanelScreenRect: CGRect`, `hoverSensorEntered()/hoverSensorExited()/openedPanelExited()`, `NotchHoverSensorWindow(onEnter:onExit:)`+`update(rect:)`, `OpenedCloseTrackingView.panelRectInView/onExit`, `NotchHoverSensorFrame.rect(isDetached:isSuppressedHidden:isFullscreenReveal:closedTriggerRect:fullscreenRevealRect:)` are used identically across tasks.
 
 ## Success criteria
 
 - Hover opens/closes the docked notch with no active session (idle), same feel as today.
-- Menu-bar click-through, closed-notch click-open, drag-to-detach all still work.
-- Hover-open never steals keyboard focus.
-- Sensor tracks the notch across screen migration and fullscreen reveal.
+- Menu-bar click-through, click-through replay, closed-notch click-open, drag-to-detach all still work.
+- Hover-open never steals keyboard focus; no close→reopen loop.
+- Sensor tracks the notch across screen migration, width changes, and fullscreen reveal; absent (no click-eater) when suppress-hidden.
 - `NotchHoverSensorFrameTests` + full `PingIslandTests` pass; app builds.

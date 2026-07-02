@@ -154,8 +154,16 @@ the sensor agree exactly:
 | Condition | Rect |
 | --- | --- |
 | Normal (closed presentation shown) | `closedScreenRect.insetBy(dx: -10, dy: -5)` (`isPointInClosedNotch`) |
-| Fullscreen reveal (`shouldHideClosedPresentation`) | `fullscreenRevealTriggerRect` |
-| Notch hidden (idle-auto-hidden / quiet-background / fullscreen-browser-hidden) | none — sensor ordered out |
+| Fullscreen edge-reveal (`isFullscreenEdgeRevealActive` && not opened) | `fullscreenRevealTriggerRect` |
+| Suppress-hidden (`isFullscreenBrowserHiddenActive`, or `isIdleAutoHiddenActive`/`isQuietBackgroundPresentationActive` while not opened) OR detached | none — sensor ordered out |
+
+Decision (2026-07-03, after Fable 5 plan review): the reveal rect is used ONLY
+for fullscreen edge-reveal, where hover-to-reveal is the intended UX. In the
+other hidden states the notch is deliberately suppressed, so the sensor is
+ordered out rather than leaving an invisible click-consuming window at
+top-center. Note this is a mouse-active window: unlike today's observe-only
+global monitor, where the sensor is present its rect consumes clicks (harmless
+on the built-in notch; verify on external screens per the edge cases).
 
 `closedScreenRect` is top-center of the current screen, so it never overlaps
 menu-bar items on the built-in display. Extract rect selection as a pure function
