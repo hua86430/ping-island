@@ -21,7 +21,7 @@ class WindowManager {
     private var pendingMigrationScreenID: CGDirectDisplayID?
     private var pendingMigrationSince: Date?
     private var dwellWorkItem: DispatchWorkItem?
-    private static let cursorFollowDwell: TimeInterval = 0.2
+    private static let cursorFollowDwell: TimeInterval = 0.1
 
     init() {
         startFocusTracking()

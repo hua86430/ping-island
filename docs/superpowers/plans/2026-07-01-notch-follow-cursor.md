@@ -14,7 +14,7 @@
 - No new always-on high-frequency event monitor; reuse the existing `EventMonitors.shared.mouseLocation` subject (its `.mouseMoved` source is already gated to `EnergyGovernor` level `.full`).
 - Routine cursor/focus migration must use the cheap reposition path (`updateScreen` → `moveToScreen`), never `invalidate()` + new coordinator. Rebuild stays only for lifecycle events (screen list change, first launch).
 - Docked window height is 750 (existing `NotchWindowController` value); the docked frame is full screen width, pinned to the top of the screen.
-- Dwell default: 0.2 s (single tunable constant).
+- Dwell default: 0.1 s (single tunable constant; lowered from 0.2 s after runtime feel testing).
 - Commit style: ticket-less Conventional Commits.
 
 ---
@@ -324,7 +324,7 @@ Add these stored properties near `lastMigrationTime`:
 ```swift
     private var pendingMigrationScreenID: CGDirectDisplayID?
     private var pendingMigrationSince: Date?
-    private static let cursorFollowDwell: TimeInterval = 0.2
+    private static let cursorFollowDwell: TimeInterval = 0.1
 ```
 
 Add a cursor subscription inside `startFocusTracking()` (after the existing `didBecomeKeyNotification` subscription):
