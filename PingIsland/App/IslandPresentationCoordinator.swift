@@ -32,6 +32,7 @@ final class IslandPresentationCoordinator {
             hasPhysicalNotch: geometry.hasPhysicalNotch,
             menuBarHeight: geometry.menuBarHeight
         )
+        dockedWindowController?.moveToScreen(screen)
         applySurfaceMode(AppSettings.surfaceMode, performBootAnimation: false)
     }
 

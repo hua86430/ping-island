@@ -18,6 +18,9 @@ class WindowManager {
     private var activeScreenNumber: NSNumber?
     private var cancellables = Set<AnyCancellable>()
     private var lastMigrationTime: Date = .distantPast
+    private var pendingMigrationScreenID: CGDirectDisplayID?
+    private var pendingMigrationSince: Date?
+    private static let cursorFollowDwell: TimeInterval = 0.2
 
     init() {
         startFocusTracking()
@@ -68,6 +71,15 @@ class WindowManager {
                 self?.handleFocusChange()
             }
             .store(in: &cancellables)
+
+        // Follow the cursor across screens in automatic mode (full monitoring only;
+        // the mouseMoved source is energy-gated in EventMonitors).
+        EventMonitors.shared.mouseLocation
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] point in
+                self?.handleCursorMovement(point)
+            }
+            .store(in: &cancellables)
     }
 
     private func handleFocusChange() {
@@ -87,9 +99,45 @@ class WindowManager {
 
         guard targetID != currentID else { return }
 
-        lastMigrationTime = now
         logger.info("Focus changed, migrating notch to cursor screen")
-        selector.migrateToScreen(targetScreen)
-        _ = setupNotchWindow()
+        migrate(to: targetScreen)
+    }
+
+    private func handleCursorMovement(_ point: CGPoint) {
+        let selector = ScreenSelector.shared
+        let cursorScreen = selector.screenContaining(point)
+        let action = NotchScreenMigrationDecider.evaluate(
+            mode: selector.selectionMode,
+            cursorScreenID: cursorScreen.flatMap { selector.screenID(of: $0) },
+            currentScreenID: selector.selectedScreen.flatMap { selector.screenID(of: $0) },
+            pendingScreenID: pendingMigrationScreenID,
+            pendingSince: pendingMigrationSince,
+            now: Date(),
+            dwell: Self.cursorFollowDwell
+        )
+        switch action {
+        case .none:
+            if cursorScreen.flatMap({ selector.screenID(of: $0) })
+                == selector.selectedScreen.flatMap({ selector.screenID(of: $0) }) {
+                pendingMigrationScreenID = nil
+                pendingMigrationSince = nil
+            }
+        case .beginDwell(let id):
+            pendingMigrationScreenID = id
+            pendingMigrationSince = Date()
+        case .migrate:
+            pendingMigrationScreenID = nil
+            pendingMigrationSince = nil
+            if let target = cursorScreen { migrate(to: target) }
+        }
+    }
+
+    /// Cheap migration: reposition the existing notch window, no rebuild.
+    private func migrate(to screen: NSScreen) {
+        let selector = ScreenSelector.shared
+        selector.migrateToScreen(screen)
+        presentationCoordinator?.updateScreen(screen)
+        activeScreenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber
+        lastMigrationTime = Date()
     }
 }
