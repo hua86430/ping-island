@@ -5,6 +5,8 @@ struct NotificationFeedView: View {
     @ObservedObject var viewModel: NotchViewModel
     var onHoverChanged: (Bool) -> Void = { _ in }
 
+    @State private var clearAllHovered = false
+
     /// Pure feed selection: unread only, newest activity first.
     nonisolated static func feedSessions(from sessions: [SessionState]) -> [SessionState] {
         sessions
@@ -36,7 +38,34 @@ struct NotificationFeedView: View {
                         }
                         .buttonStyle(.plain)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.white.opacity(0.55))
+                        .foregroundColor(.white.opacity(clearAllHovered ? 0.9 : 0.55))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(
+                            Capsule().fill(Color.white.opacity(clearAllHovered ? 0.12 : 0.0))
+                        )
+                        .contentShape(Capsule())
+                        .onHover { hovering in
+                            guard hovering != clearAllHovered else { return }
+                            clearAllHovered = hovering
+                            // push/pop, same reasoning as the feed rows: `.set()`
+                            // is overwritten on redraw. The header button vanishes
+                            // when the feed empties (including right after this tap
+                            // marks all read), so onDisappear pops to avoid leaking
+                            // the hand cursor.
+                            if hovering {
+                                NSCursor.pointingHand.push()
+                            } else {
+                                NSCursor.pop()
+                            }
+                        }
+                        .onDisappear {
+                            if clearAllHovered {
+                                NSCursor.pop()
+                                clearAllHovered = false
+                            }
+                        }
+                        .animation(.easeOut(duration: 0.12), value: clearAllHovered)
                     }
                 }
                 .padding(.horizontal, 12)
