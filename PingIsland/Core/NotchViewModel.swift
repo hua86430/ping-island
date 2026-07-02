@@ -750,15 +750,37 @@ class NotchViewModel: ObservableObject {
         shouldHideWindowPresentation ? -(closedHeight + 12) : 0
     }
 
-    func isPointInHoverTrigger(_ point: CGPoint) -> Bool {
+    var hoverTriggerRect: CGRect {
         if shouldHideClosedPresentation {
-            return fullscreenRevealTriggerRect.contains(point)
+            return fullscreenRevealTriggerRect
         }
-        return isPointInClosedNotch(point)
+        return closedScreenRect.insetBy(dx: -10, dy: -5)
     }
 
-    private func isPointInClosedNotch(_ point: CGPoint) -> Bool {
-        closedScreenRect.insetBy(dx: -10, dy: -5).contains(point)
+    func isPointInHoverTrigger(_ point: CGPoint) -> Bool {
+        hoverTriggerRect.contains(point)
+    }
+
+    /// Frame for the always-on hover-sensor window; nil when the docked notch
+    /// is not present (detached or suppress-hidden). Reveal rect only for the
+    /// fullscreen edge-reveal case.
+    var hoverSensorRect: CGRect? {
+        let isRevealActive = isFullscreenEdgeRevealActive && status != .opened
+        let isSuppressed = isFullscreenBrowserHiddenActive
+            || (isIdleAutoHiddenActive && status != .opened)
+            || (isQuietBackgroundPresentationActive && status != .opened)
+        return NotchHoverSensorFrame.rect(
+            isDetached: presentationMode != .docked,
+            isSuppressedHidden: isSuppressed,
+            isFullscreenReveal: isRevealActive,
+            closedTriggerRect: closedScreenRect.insetBy(dx: -10, dy: -5),
+            fullscreenRevealRect: fullscreenRevealTriggerRect
+        )
+    }
+
+    /// Screen rect of the opened panel (used for close-on-leave tracking).
+    var openedPanelScreenRect: CGRect {
+        geometry.openedScreenRect(for: openedSize)
     }
 
     func updateIdleAutoHiddenState(hasVisibleSessionActivity: Bool) {
