@@ -350,7 +350,12 @@ struct NotchView: View {
         let clampedDuration = min(max(AppSettings.shared.notchOpenAnimationDuration, 0.15), 0.8)
         return .spring(response: clampedDuration, dampingFraction: 0.8, blendDuration: 0)
     }
-    private let closeAnimation = Animation.spring(response: 0.45, dampingFraction: 1.0, blendDuration: 0)
+    private var closeAnimation: Animation {
+        // Collapse uses the same user-adjustable duration as expand so the two
+        // always feel symmetric; only the damping differs (no bounce on close).
+        let clampedDuration = min(max(AppSettings.shared.notchOpenAnimationDuration, 0.15), 0.8)
+        return .spring(response: clampedDuration, dampingFraction: 1.0, blendDuration: 0)
+    }
 
     // MARK: - Body
 
