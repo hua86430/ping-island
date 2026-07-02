@@ -181,7 +181,9 @@ class NotchWindowController: NSWindowController {
         switch viewModel.status {
         case .opened:
             window.ignoresMouseEvents = false
-            if viewModel.openReason != .notification {
+            // Hover-open is a preview: never steal keyboard focus from the
+            // terminal. Only deliberate opens (click / shortcut) activate.
+            if viewModel.openReason != .notification && viewModel.openReason != .hover {
                 NSApp.activate(ignoringOtherApps: false)
                 window.makeKey()
             }
