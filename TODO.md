@@ -20,6 +20,9 @@
   - desc: (1) `HoverSessionCard` 對 attention/dashboard 卡傳 `opensOnTap:false`，唯讀 reminder 卡的 tap 從不觸發 activate → 對 terminalRoutedReminder bypass 該 guard（commit c3fb37c）。驗：你 04:17 在含此修正的 build 上真實點擊，log 出現 `SessionLauncher Activate request ... cc-workspace`（修正前 0 筆）。(2) Ghostty focus AppleScript 只 `focus <terminal>`（切 tab）沒 `activate`（抬 app）→ tell block 開頭加 `activate`。驗：實跑 AppleScript，frontmost Finder→ghostty。卡渲染從 image 20 確認。限制：受工具限（無 cliclick、notch 未自動彈合成 session）沒能單獨跑「一次點擊→抬前」端到端，兩段各自驗。「有時沒卡」= 問題已解決（transcript 有 tool_result）為正確行為，非 bug。
 
 
+- [ ] 完成卡 presenter 在本機從不 present — 既有謎，待診斷
+  - desc: `autoOpenCompletionPanel` 開、無 mute、無 smartSuppression，三次真實回覆完成仍無完成卡（feed banner 已補位使用者需求）。0.25.0 前 live 實測發現，非該功能 diff 造成。證據 `.superpowers/sdd/feed-autoopen-selftest-report.md`。
+
 - [ ] cursor-follow：島跨螢幕跟隨游標、消除搬移延遲 — 計畫就緒，未實作
   - desc: spec `docs/superpowers/specs/2026-07-01-notch-follow-cursor-design.md`；plan `docs/superpowers/plans/2026-07-01-notch-follow-cursor.md`（commit d85e3fc）。
 
