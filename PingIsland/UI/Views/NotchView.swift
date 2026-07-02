@@ -8,6 +8,7 @@
 import AppKit
 import CoreGraphics
 import SwiftUI
+import os.log
 
 // Corner radius constants
 private let cornerRadiusInsets = (
@@ -39,6 +40,8 @@ struct NotchView: View {
     @ObservedObject private var updateManager = UpdateManager.shared
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var screenSelector = ScreenSelector.shared
+    private static let presentationLogger = Logger(subsystem: "com.wudanwu.pingisland", category: "AutoOpen")
+
     @State private var previousPendingIds: Set<String> = []
     @State private var previousUnreadIds: Set<String> = []
     @State private var manualAttentionTracker = SessionManualAttentionTracker()
@@ -1041,12 +1044,16 @@ struct NotchView: View {
         }
 
         let newPendingSessions = sessions.filter { newPendingIds.contains($0.stableId) }
+        Self.presentationLogger.debug(
+            "pendingChange sessions=\(sessions.count) newIds=\(newPendingIds.count) feed=\(AppSettings.shared.notificationFeedMode) status=\(String(describing: viewModel.status), privacy: .public) suppress=\(shouldSuppressAutoOpen)"
+        )
         if NotchAutoOpenPolicy.shouldAutoOpenForNewPendingSessions(
             newPending: newPendingSessions,
             feedMode: AppSettings.shared.notificationFeedMode
         ),
            viewModel.status == .closed,
            !shouldSuppressAutoOpen {
+            Self.presentationLogger.debug("pendingChange -> notchOpen(.notification)")
             viewModel.notchOpen(reason: .notification)
             armFeedBannerDismissalIfNeeded(instances: sessions)
         }
