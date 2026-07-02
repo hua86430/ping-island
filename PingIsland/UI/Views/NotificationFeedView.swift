@@ -142,14 +142,23 @@ private struct NotificationFeedRow: View {
         .buttonStyle(.plain)
         .padding(.horizontal, 8)
         .onHover { hovering in
+            guard hovering != isHovered else { return }
             isHovered = hovering
-            // `.set()` instead of push/pop: a feed row can be removed while
-            // hovered (list refresh), and push without a matching pop would
-            // leak the pointing-hand cursor.
+            // push/pop, not `.set()`: SwiftUI resets the cursor to arrow on
+            // every redraw, so a one-shot `.set()` is overwritten immediately.
+            // The stack survives redraws. `onDisappear` pops if the row is
+            // removed while still hovered (feed refresh) so the hand cursor
+            // never leaks. Target is macOS 14, so `.pointerStyle` is unavailable.
             if hovering {
-                NSCursor.pointingHand.set()
+                NSCursor.pointingHand.push()
             } else {
-                NSCursor.arrow.set()
+                NSCursor.pop()
+            }
+        }
+        .onDisappear {
+            if isHovered {
+                NSCursor.pop()
+                isHovered = false
             }
         }
         .animation(.easeOut(duration: 0.12), value: isHovered)
