@@ -4,6 +4,9 @@
 
 ## 待處理
 
+- [ ] 全 app 簡體中文清零（繁化總掃）— spec + plan 就緒，未實作
+  - desc: 0.24.4 只做了部分繁化，設定 GUI（含下拉選單）、執行期狀態文字仍漏簡體。稽核（ICU Hans-Hant 逐字掃 `PingIsland/`）結果：zh-Hant.lproj 值殘留簡體 2 筆（占→佔，行 54/168）+ en 有 zh-Hant 缺 1 key；app Swift 命中 729 列，其中 350 列是已有值的 key（多數安全）、47 列（41 個 key）指向 zh-Hant 缺值 key → 螢幕 fallback 簡體、146 列硬編簡體字面量。三種漏法：缺值 key fallback、`Text(verbatim:)`/插值硬編、enum `title`/`subtitle` 下拉選單標籤。修法分流：zh-Hant 值就地改繁；缺值 key 補 zh-Hant(+en) 值（不動 Swift）；硬編字面量就地繁化。務必保留：簡體 KEY（識別碼，`SettingsWindowControllerTests` 有斷言）、比對「傳入 agent 簡體輸出」的 matcher（`SessionState` 進度陣列、`SessionStore` Qoder 提問偵測共 26 列 — 白名單）。反向特例：`UpdateReleaseNotes` iconSymbolName 比對的是繁體 release notes，要改繁才對得上。逐字校正陷阱（ICU 會錯）：複製 / 回覆 / 答覆 / 標準 / 準備 / …裡 / 關係。含一支 guard scanner（`scripts/check-simplified-chinese.swift`）+ Xcode guard test 防回歸。spec `docs/superpowers/specs/2026-07-04-full-app-traditional-chinese-sweep-design.md`；plan `docs/superpowers/plans/2026-07-04-full-app-traditional-chinese-sweep.md`。
+
 - [x] 通知 feed 自動彈開切開（auto-open decoupling）— 已發 0.25.0（含懸停延遲/動畫時長滑桿、助理回覆才算未讀）
   - desc: feed mode 下:開新 session/打字永不彈;提問/審批照彈且留;回覆完成 → 彈 feed banner 5 秒自收（hover 暫停、移開即收、自癒 re-arm）;session mode 逐位元組不變（決策 log 證明）。live 實測抓到並修掉 willSet-stale arming + stuck-open;既有完成卡 presenter 在本機從不 present = 既有謎、另開診斷（feed banner 已補位）。spec `docs/superpowers/specs/2026-07-02-feed-mode-auto-open-design.md`;證據 `.superpowers/sdd/feed-autoopen-selftest-report.md`。
 
