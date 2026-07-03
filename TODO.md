@@ -26,6 +26,15 @@
 - [x] cursor-follow：島跨螢幕跟隨游標、消除搬移延遲 — 實作完成，執行期實測核心行為通過
   - desc: spec `docs/superpowers/specs/2026-07-01-notch-follow-cursor-design.md`；plan `docs/superpowers/plans/2026-07-01-notch-follow-cursor.md`（commit d85e3fc）。實作 commits 7f7fc05（`NotchWindowController.moveToScreen` + frame helper，2 test）、7c6dd26（純 `NotchScreenMigrationDecider`，7 test）、3ca6de8（`WindowManager` 訂閱 `EventMonitors.mouseLocation`、走 `updateScreen`→`moveToScreen` cheap path、focus 遷移改用 `migrate`；AGENTS.md）。全 `PingIslandTests` 綠。執行期實測（2 外接螢幕、合成 mouseMoved 事件驅動 fresh Debug build）：0→1 遷移 PASS（notch x=0→2560）、dwell gate 不即時遷移 PASS、cheap path 無 rebuild（migrate() 不碰 setupNotchWindow）。未執行期驗：specific-screen 不遷移（僅 decider guard 單元測試）、內建↔外接 notch 高度（測時 clamshell 無 active 內建）。
 
+- [x] 設定視窗原生化重寫（NavigationSplitView + macOS 26 Liquid Glass）— 已發 0.25.3
+  - desc: 6900+ 行 `SettingsWindowView.swift` 單體檔重構為一檔一責模組（`PingIsland/UI/Views/Settings/`：SettingsRootView 殼 + SettingsSidebarView + SettingsDetailRouter + SettingsPanelViewModel + Components/ + Categories/ 十分類各一檔），搬移不改行為。視窗換原生 titled chrome（真紅綠燈／可拖／最小化／縮放、原生陰影），移除 popover 死碼。sidebar 扁平單行 + 彩色 icon + 原生選中高亮；chrome 改用原生 safe area + `hostingController.sizingOptions = []`（不 hardcode 位移／尺寸）。CI 用 macOS 26 SDK（release-unsigned.yml select Xcode 26）編 → macOS 26 上 sidebar 採 Liquid Glass；deployment target 維持 14。spec `docs/superpowers/specs/2026-07-03-settings-navigation-split-design.md`、plan `docs/superpowers/plans/2026-07-03-settings-navigation-split.md`；merge b3e8ef1、release d4bd7ac。build／unit／UI 全綠（Xcode 26 SDK）。
+
+- [ ] 簽章發版（release-packages.yml）補 Xcode 26 select — 未做
+  - desc: 目前只有 `release-unsigned.yml` 加了「Select Xcode 26」步驟。`release-packages.yml`（Developer ID + notarize、workflow_dispatch-only、tag 不觸發）仍是 macos-15 預設 Xcode 16，走簽章發版出的包在 macOS 26 上不會有 Liquid Glass。要比照補同樣 select 步驟。
+
+- [ ] macOS 26 SDK 全 app 外觀掃查 — 未做
+  - desc: 0.25.3 起用 macOS 26 SDK 編，自動 Liquid Glass 是全 app 生效、不只設定視窗。notch UI、detached 浮動島、welcome／hook 視窗等自刻 AppKit 視窗在 macOS 26 下的外觀只驗過設定視窗，其餘待逐一目視確認沒被玻璃化弄歪。
+
 - [ ] Ctrl-C 退出的 session 殘留通知欄 — spec 就緒，未實作
   - desc: local Claude hook session `pid` 恆為 nil → 存活檢查跳過 → Ctrl-C 後卡 `.idle` 永不 `.ended`。修法：liveness sweep 用 `ProcessTreeBuilder` 查該 tty 上是否還有 `claude`。spec `docs/superpowers/specs/2026-07-01-ctrlc-session-liveness-design.md`。
 
