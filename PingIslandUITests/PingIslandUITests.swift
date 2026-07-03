@@ -11,8 +11,11 @@ final class PingIslandUITests: XCTestCase {
         app.launchEnvironment["PING_ISLAND_UI_TEST_MODE"] = "1"
         app.launch()
 
-        XCTAssertTrue(app.buttons["settings.sidebar.general"].waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["登录时打开"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.descendants(matching: .any)["settings.sidebar.general"].waitForExistence(timeout: 5))
+        // Assert on the detail identifier rather than a localized label: the shipped
+        // locale is zh-Hant, so the general toggle renders as "登入時打開", not the
+        // simplified source key. The identifier is locale-independent.
+        XCTAssertTrue(app.descendants(matching: .any)["settings.detail.general"].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -21,10 +24,15 @@ final class PingIslandUITests: XCTestCase {
         app.launchEnvironment["PING_ISLAND_UI_TEST_MODE"] = "1"
         app.launch()
 
-        let aboutButton = app.buttons["settings.sidebar.about"]
-        XCTAssertTrue(aboutButton.waitForExistence(timeout: 5))
+        // The identifier lands on several nested elements (row content + List cell
+        // wrapper + sidebar ScrollView). firstMatch resolves to the ScrollView, which
+        // has no hit point, so pick the first hittable match to tap.
+        let aboutMatches = app.descendants(matching: .any).matching(identifier: "settings.sidebar.about")
+        XCTAssertTrue(aboutMatches.firstMatch.waitForExistence(timeout: 5))
+        let aboutButton = aboutMatches.allElementsBoundByIndex.first(where: { $0.isHittable }) ?? aboutMatches.firstMatch
         aboutButton.tap()
 
-        XCTAssertTrue(app.staticTexts["应用信息"].waitForExistence(timeout: 5))
+        // Locale-independent: verify the detail router switched to the about page.
+        XCTAssertTrue(app.descendants(matching: .any)["settings.detail.about"].waitForExistence(timeout: 5))
     }
 }
