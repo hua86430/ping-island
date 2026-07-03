@@ -93,6 +93,89 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(snapshot.spendSummary.dailyPoints.last?.tokenTotal, 150)
     }
 
+    func testMakeSnapshotBuildsPerModelBreakdownAndDailySpend() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_775_520_000)
+        let today = AgentUsageStore.dayKey(for: now, calendar: calendar)
+        let opus = AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000)   // 5 + 25 = 30 USD
+        let haiku = AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000)  // 1 + 5 = 6 USD
+        var aggregate = AgentUsageTokenTotals()
+        aggregate.add(opus)
+        aggregate.add(haiku)
+
+        let document = AgentUsageDocument(
+            buckets: [
+                today: AgentUsageDailyBucket(
+                    day: today,
+                    tokenTotals: aggregate,
+                    tokenTotalsByModel: ["opus-4.8": opus, "haiku-4.5": haiku],
+                    activityCount: 1
+                ),
+            ]
+        )
+
+        let snapshot = AgentUsageStore.makeSnapshot(range: .sevenDays, document: document, now: now, calendar: calendar)
+
+        XCTAssertEqual(snapshot.perModelBreakdown.map(\.modelKey), ["opus-4.8", "haiku-4.5"])
+        XCTAssertEqual(snapshot.perModelBreakdown.first?.displayName, "Opus 4.8")
+        XCTAssertEqual(snapshot.perModelBreakdown.first?.estimatedUSD ?? 0, 30.0, accuracy: 0.000_001)
+        XCTAssertEqual(snapshot.perModelBreakdown.last?.estimatedUSD ?? 0, 6.0, accuracy: 0.000_001)
+
+        XCTAssertEqual(snapshot.perModelDailySpend.map(\.modelKey), ["opus-4.8", "haiku-4.5"])
+        XCTAssertTrue(snapshot.perModelDailySpend.allSatisfy { $0.points.count == 30 })
+        XCTAssertEqual(snapshot.perModelDailySpend.first?.totalUSD ?? 0, 30.0, accuracy: 0.000_001)
+        XCTAssertEqual(snapshot.perModelDailySpend.first?.points.last?.estimatedUSD ?? 0, 30.0, accuracy: 0.000_001)
+        XCTAssertEqual(snapshot.perModelDailySpend.first?.points.first?.estimatedUSD ?? -1, 0, accuracy: 0.000_001)
+
+        // headline：逐 model 官方費率，Opus 4.8 桶以 5/25 計、非 blend
+        XCTAssertEqual(snapshot.spendSummary.today.estimatedUSD, 36.0, accuracy: 0.000_001)
+    }
+
+    func testLegacyBucketCostFallsBackToBlend() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_775_520_000)
+        let today = AgentUsageStore.dayKey(for: now, calendar: calendar)
+        let aggregate = AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000)
+
+        let document = AgentUsageDocument(
+            buckets: [
+                // pre-upgrade bucket: empty per-model map, aggregate only
+                today: AgentUsageDailyBucket(day: today, tokenTotals: aggregate, activityCount: 1),
+            ]
+        )
+
+        let snapshot = AgentUsageStore.makeSnapshot(range: .today, document: document, now: now, calendar: calendar)
+
+        XCTAssertTrue(snapshot.perModelBreakdown.isEmpty)
+        XCTAssertEqual(snapshot.spendSummary.today.estimatedUSD, 16.875, accuracy: 0.000_001)
+        XCTAssertEqual(snapshot.spendSummary.dailyPoints.last?.estimatedUSD ?? 0, 16.875, accuracy: 0.000_001)
+    }
+
+    func testMixedUpgradeDayBucketChargesResidualAtBlend() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_775_520_000)
+        let today = AgentUsageStore.dayKey(for: now, calendar: calendar)
+
+        let document = AgentUsageDocument(
+            buckets: [
+                today: AgentUsageDailyBucket(
+                    day: today,
+                    tokenTotals: AgentUsageTokenTotals(input: 2_000_000, output: 2_000_000),
+                    tokenTotalsByModel: ["opus-4.8": AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000)],
+                    activityCount: 2
+                ),
+            ]
+        )
+
+        let snapshot = AgentUsageStore.makeSnapshot(range: .today, document: document, now: now, calendar: calendar)
+
+        // 30 (official opus) + 16.875 (blend on the pre-upgrade residual 1M/1M)
+        XCTAssertEqual(snapshot.spendSummary.today.estimatedUSD, 46.875, accuracy: 0.000_001)
+    }
+
     func testCostEstimatorUsesBlendedCodexClaudePricing() {
         let cost = AgentUsageCostEstimator.estimateUSD(
             for: AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000)

@@ -166,6 +166,23 @@ struct AgentUsageDailySpendPoint: Equatable, Identifiable, Sendable {
     nonisolated var tokenTotal: Int { tokenTotals.resolvedTotal }
 }
 
+struct AgentUsageModelBreakdownItem: Identifiable, Equatable, Sendable {
+    let modelKey: String       // 正規化後用於配色的穩定鍵
+    let displayName: String
+    let tokenTotals: AgentUsageTokenTotals
+    let estimatedUSD: Double
+    nonisolated var id: String { modelKey }
+    nonisolated var tokenTotal: Int { tokenTotals.resolvedTotal }
+}
+
+struct AgentUsageModelDailySpend: Identifiable, Equatable, Sendable {
+    let modelKey: String
+    let displayName: String
+    let points: [AgentUsageDailySpendPoint]   // 對齊 spendDayCount(30) 天，缺日補 0
+    nonisolated var id: String { modelKey }
+    nonisolated var totalUSD: Double { points.reduce(0) { $0 + $1.estimatedUSD } }   // computed，非 stored（fable5 6b）
+}
+
 struct AgentUsageSpendSummary: Equatable, Sendable {
     let today: AgentUsageCostMetric
     let sevenDays: AgentUsageCostMetric
@@ -248,6 +265,8 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
     let heatmapDays: [AgentUsageHeatmapDay]
     let trendPoints: [AgentUsageTrendPoint]
     let spendSummary: AgentUsageSpendSummary
+    let perModelBreakdown: [AgentUsageModelBreakdownItem]     // 依 estimatedUSD 降序，範圍隨 selectedRange
+    let perModelDailySpend: [AgentUsageModelDailySpend]       // 30 天，逐 model 一條線，依 totalUSD 降序
 
     nonisolated static func empty(range: AgentUsageRange, now: Date = Date(), calendar: Calendar = .current) -> AgentUsageDashboardSnapshot {
         AgentUsageDashboardSnapshot(
@@ -259,7 +278,9 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
             topTools: [],
             heatmapDays: recentHeatmapDays(now: now, buckets: [:], calendar: calendar),
             trendPoints: trendPoints(now: now, buckets: [:], calendar: calendar),
-            spendSummary: Self.spendSummary(now: now, buckets: [:], calendar: calendar)
+            spendSummary: Self.spendSummary(now: now, buckets: [:], calendar: calendar),
+            perModelBreakdown: [],
+            perModelDailySpend: []
         )
     }
 
@@ -320,23 +341,46 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
         )
     }
 
+    // Per-bucket cost: official per-model rates for the mapped share, blended rate for
+    // the residual. Post-upgrade buckets: residual == 0 (invariant). Legacy buckets:
+    // empty map, whole aggregate stays blended. Mixed upgrade-day buckets: the
+    // pre-upgrade share stays blended so it does not vanish (fable5 6a).
+    fileprivate nonisolated static func bucketCost(_ bucket: AgentUsageDailyBucket) -> Double {
+        var perModelSum = AgentUsageTokenTotals()
+        for totals in bucket.tokenTotalsByModel.values {
+            perModelSum.add(totals)
+        }
+        let residual = AgentUsageTokenTotals(
+            input: max(0, bucket.tokenTotals.input - perModelSum.input),
+            cacheCreation: max(0, bucket.tokenTotals.cacheCreation - perModelSum.cacheCreation),
+            cacheRead: max(0, bucket.tokenTotals.cacheRead - perModelSum.cacheRead),
+            output: max(0, bucket.tokenTotals.output - perModelSum.output)
+        )
+        return AgentUsageModelPricing.estimateUSD(perModel: bucket.tokenTotalsByModel)
+            + AgentUsageCostEstimator.estimateUSD(for: residual)
+    }
+
     private nonisolated static func costMetric(
         range: AgentUsageRange,
         now: Date,
         buckets: [String: AgentUsageDailyBucket],
         calendar: Calendar
     ) -> AgentUsageCostMetric {
-        let totals = tokenTotals(
-            for: range.dayCount,
-            now: now,
-            buckets: buckets,
-            calendar: calendar
-        )
-        return AgentUsageCostMetric(
-            range: range,
-            tokenTotals: totals,
-            estimatedUSD: AgentUsageCostEstimator.estimateUSD(for: totals)
-        )
+        let today = calendar.startOfDay(for: now)
+        var totals = AgentUsageTokenTotals()
+        var estimatedUSD: Double = 0
+
+        for offset in 0..<range.dayCount {
+            guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
+                continue
+            }
+            let key = AgentUsageStore.dayKey(for: date, calendar: calendar)
+            guard let bucket = buckets[key] else { continue }
+            totals.add(bucket.tokenTotals)
+            estimatedUSD += bucketCost(bucket)
+        }
+
+        return AgentUsageCostMetric(range: range, tokenTotals: totals, estimatedUSD: estimatedUSD)
     }
 
     private nonisolated static func dailySpendPoints(
@@ -355,29 +399,51 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
             return AgentUsageDailySpendPoint(
                 date: date,
                 tokenTotals: totals,
-                estimatedUSD: AgentUsageCostEstimator.estimateUSD(for: totals)
+                estimatedUSD: buckets[key].map(Self.bucketCost) ?? 0
             )
         }
     }
 
-    private nonisolated static func tokenTotals(
-        for dayCount: Int,
+    fileprivate nonisolated static func perModelDailySpend(
         now: Date,
         buckets: [String: AgentUsageDailyBucket],
         calendar: Calendar
-    ) -> AgentUsageTokenTotals {
+    ) -> [AgentUsageModelDailySpend] {
         let today = calendar.startOfDay(for: now)
-        var totals = AgentUsageTokenTotals()
-
-        for offset in 0..<dayCount {
+        let dayEntries: [(date: Date, bucket: AgentUsageDailyBucket?)] = (0..<spendDayCount).reversed().compactMap { offset in
             guard let date = calendar.date(byAdding: .day, value: -offset, to: today) else {
-                continue
+                return nil
             }
-            let key = AgentUsageStore.dayKey(for: date, calendar: calendar)
-            totals.add(buckets[key]?.tokenTotals ?? AgentUsageTokenTotals())
+            return (date, buckets[AgentUsageStore.dayKey(for: date, calendar: calendar)])
         }
 
-        return totals
+        var modelKeys: Set<String> = []
+        for entry in dayEntries {
+            if let bucket = entry.bucket {
+                modelKeys.formUnion(bucket.tokenTotalsByModel.keys)
+            }
+        }
+
+        return modelKeys
+            .map { key in
+                let points = dayEntries.map { entry -> AgentUsageDailySpendPoint in
+                    let totals = entry.bucket?.tokenTotalsByModel[key] ?? AgentUsageTokenTotals()
+                    return AgentUsageDailySpendPoint(
+                        date: entry.date,
+                        tokenTotals: totals,
+                        estimatedUSD: AgentUsageModelPricing.pricing(forModel: key).estimateUSD(for: totals)
+                    )
+                }
+                return AgentUsageModelDailySpend(
+                    modelKey: key,
+                    displayName: AgentUsageModelPricing.displayName(forModel: key),
+                    points: points
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.totalUSD == rhs.totalUSD { return lhs.modelKey < rhs.modelKey }
+                return lhs.totalUSD > rhs.totalUSD
+            }
     }
 }
 
@@ -909,6 +975,7 @@ actor AgentUsageStore {
         var agentSessions: [String: Set<String>] = [:]
         var toolCounts: [String: Int] = [:]
         var tokenTotals = AgentUsageTokenTotals()
+        var perModelTotals: [String: AgentUsageTokenTotals] = [:]
 
         for bucket in includedBuckets {
             for (agent, sessions) in bucket.sessionIDsByAgent {
@@ -918,10 +985,26 @@ actor AgentUsageStore {
                 toolCounts[tool, default: 0] += count
             }
             tokenTotals.add(bucket.tokenTotals)
+            for (model, totals) in bucket.tokenTotalsByModel {
+                perModelTotals[model, default: AgentUsageTokenTotals()].add(totals)
+            }
         }
 
         let sessionCount = agentSessions.values.reduce(0) { $0 + $1.count }
         let toolUseCount = toolCounts.values.reduce(0, +)
+        let perModelBreakdown = perModelTotals
+            .map { key, totals in
+                AgentUsageModelBreakdownItem(
+                    modelKey: key,
+                    displayName: AgentUsageModelPricing.displayName(forModel: key),
+                    tokenTotals: totals,
+                    estimatedUSD: AgentUsageModelPricing.pricing(forModel: key).estimateUSD(for: totals)
+                )
+            }
+            .sorted { lhs, rhs in
+                if lhs.estimatedUSD == rhs.estimatedUSD { return lhs.modelKey < rhs.modelKey }
+                return lhs.estimatedUSD > rhs.estimatedUSD
+            }
 
         return AgentUsageDashboardSnapshot(
             range: range,
@@ -944,6 +1027,12 @@ actor AgentUsageStore {
                 calendar: calendar
             ),
             spendSummary: AgentUsageDashboardSnapshot.spendSummary(
+                now: now,
+                buckets: document.buckets,
+                calendar: calendar
+            ),
+            perModelBreakdown: perModelBreakdown,
+            perModelDailySpend: AgentUsageDashboardSnapshot.perModelDailySpend(
                 now: now,
                 buckets: document.buckets,
                 calendar: calendar
