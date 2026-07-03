@@ -194,4 +194,40 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 75, output: 30))
         XCTAssertEqual(snapshot.sessionCount, 1)
     }
+
+    func testDailyBucketRecordTokensPerModelKeepsAggregateInvariant() {
+        var bucket = AgentUsageDailyBucket(day: "2026-07-04")
+
+        bucket.recordTokens(perModel: [
+            "opus-4.8": AgentUsageTokenTotals(input: 100, cacheCreation: 10, cacheRead: 5, output: 40),
+            "haiku-4.5": AgentUsageTokenTotals(input: 20, output: 8),
+        ])
+
+        XCTAssertEqual(
+            bucket.tokenTotals,
+            AgentUsageTokenTotals(input: 120, cacheCreation: 10, cacheRead: 5, output: 48)
+        )
+        var summed = AgentUsageTokenTotals()
+        for totals in bucket.tokenTotalsByModel.values { summed.add(totals) }
+        XCTAssertEqual(bucket.tokenTotals, summed, "aggregate must equal the sum of tokenTotalsByModel")
+        XCTAssertEqual(bucket.tokenTotalsByModel.count, 2)
+        XCTAssertEqual(bucket.activityCount, 1, "one activity per delta batch, not per model")
+    }
+
+    func testDailyBucketRecordTokensPerModelSkipsEmptyBatch() {
+        var bucket = AgentUsageDailyBucket(day: "2026-07-04")
+        bucket.recordTokens(perModel: ["opus-4.8": AgentUsageTokenTotals()])
+        XCTAssertEqual(bucket.activityCount, 0)
+        XCTAssertTrue(bucket.tokenTotalsByModel.isEmpty)
+    }
+
+    func testDailyBucketDecodesLegacyJSONWithoutPerModelMap() throws {
+        let legacyJSON = """
+        {"day":"2026-07-01","sessionIDsByAgent":{},"toolCounts":{},"tokenTotals":{"input":10,"cacheCreation":0,"cacheRead":0,"output":5},"activityCount":2}
+        """
+        let bucket = try JSONDecoder().decode(AgentUsageDailyBucket.self, from: Data(legacyJSON.utf8))
+        XCTAssertEqual(bucket.tokenTotalsByModel, [:])
+        XCTAssertEqual(bucket.tokenTotals, AgentUsageTokenTotals(input: 10, output: 5))
+        XCTAssertEqual(bucket.activityCount, 2)
+    }
 }

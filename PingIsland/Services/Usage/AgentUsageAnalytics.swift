@@ -380,6 +380,7 @@ struct AgentUsageDailyBucket: Codable, Equatable, Sendable {
     var sessionIDsByAgent: [String: Set<String>]
     var toolCounts: [String: Int]
     var tokenTotals: AgentUsageTokenTotals
+    var tokenTotalsByModel: [String: AgentUsageTokenTotals]
     var activityCount: Int
 
     nonisolated init(
@@ -387,13 +388,31 @@ struct AgentUsageDailyBucket: Codable, Equatable, Sendable {
         sessionIDsByAgent: [String: Set<String>] = [:],
         toolCounts: [String: Int] = [:],
         tokenTotals: AgentUsageTokenTotals = AgentUsageTokenTotals(),
+        tokenTotalsByModel: [String: AgentUsageTokenTotals] = [:],
         activityCount: Int = 0
     ) {
         self.day = day
         self.sessionIDsByAgent = sessionIDsByAgent
         self.toolCounts = toolCounts
         self.tokenTotals = tokenTotals
+        self.tokenTotalsByModel = tokenTotalsByModel
         self.activityCount = activityCount
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case day, sessionIDsByAgent, toolCounts, tokenTotals, tokenTotalsByModel, activityCount
+    }
+
+    // Pre-upgrade buckets have no tokenTotalsByModel key: decode it as an empty map
+    // so old data keeps loading (no schemaVersion bump, no wipe).
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        day = try container.decode(String.self, forKey: .day)
+        sessionIDsByAgent = try container.decodeIfPresent([String: Set<String>].self, forKey: .sessionIDsByAgent) ?? [:]
+        toolCounts = try container.decodeIfPresent([String: Int].self, forKey: .toolCounts) ?? [:]
+        tokenTotals = try container.decodeIfPresent(AgentUsageTokenTotals.self, forKey: .tokenTotals) ?? AgentUsageTokenTotals()
+        tokenTotalsByModel = try container.decodeIfPresent([String: AgentUsageTokenTotals].self, forKey: .tokenTotalsByModel) ?? [:]
+        activityCount = try container.decodeIfPresent(Int.self, forKey: .activityCount) ?? 0
     }
 
     nonisolated mutating func recordSession(agent: String, sessionID: String) {
@@ -409,6 +428,21 @@ struct AgentUsageDailyBucket: Codable, Equatable, Sendable {
     nonisolated mutating func recordTokens(_ totals: AgentUsageTokenTotals) {
         tokenTotals.add(totals)
         if totals.resolvedTotal > 0 {
+            activityCount += 1
+        }
+    }
+
+    // Invariant: tokenTotals always equals the sum of tokenTotalsByModel values for
+    // data written through this method.
+    nonisolated mutating func recordTokens(perModel deltasByModel: [String: AgentUsageTokenTotals]) {
+        var combined = AgentUsageTokenTotals()
+        for (model, delta) in deltasByModel {
+            guard delta.hasTokens else { continue }
+            tokenTotalsByModel[model, default: AgentUsageTokenTotals()].add(delta)
+            combined.add(delta)
+        }
+        tokenTotals.add(combined)
+        if combined.resolvedTotal > 0 {
             activityCount += 1
         }
     }
