@@ -208,6 +208,51 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(snapshot.sessionCount, 1)
     }
 
+    func testRecordCodexUsageSnapshotReusesBaselineKeyWhenModelMissing() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ping-island-codex-key-stability-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directoryURL.appendingPathComponent("usage.json")
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let store = AgentUsageStore(fileURL: fileURL, calendar: calendar)
+        let capturedAt = Date(timeIntervalSince1970: 1_775_520_000)
+        let sourcePath = "/tmp/.codex/sessions/2026/04/10/rollout-2026-04-10T00-00-00-019db9a7-336a-7b62-9288-7304c3d2d4b9.jsonl"
+
+        await store.recordCodexUsageSnapshot(CodexUsageSnapshot(
+            sourceFilePath: sourcePath,
+            capturedAt: capturedAt,
+            planType: "pro",
+            limitID: "codex",
+            tokenUsage: CodexTokenUsage(inputTokens: 100, outputTokens: 50, totalTokens: 150),
+            model: "gpt-5.5",
+            windows: []
+        ))
+        // Same thread, but this scan could not see a turn_context (model == nil).
+        // The key must NOT flip to "unknown", or the whole thread double counts.
+        await store.recordCodexUsageSnapshot(CodexUsageSnapshot(
+            sourceFilePath: sourcePath,
+            capturedAt: capturedAt,
+            planType: "pro",
+            limitID: "codex",
+            tokenUsage: CodexTokenUsage(inputTokens: 175, outputTokens: 80, totalTokens: 255),
+            model: nil,
+            windows: []
+        ))
+
+        let snapshot = await store.snapshot(range: .today, now: capturedAt)
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 75, output: 30))
+
+        await store.flush()
+        let document = try JSONDecoder().decode(AgentUsageDocument.self, from: Data(contentsOf: fileURL))
+        let day = AgentUsageStore.dayKey(for: capturedAt, calendar: calendar)
+        let bucket = try XCTUnwrap(document.buckets[day])
+        XCTAssertEqual(bucket.tokenTotalsByModel, ["gpt-5.5": AgentUsageTokenTotals(input: 75, output: 30)])
+        let baselineKey = AgentUsageDocument.codexTokenSourceKey("019db9a7-336a-7b62-9288-7304c3d2d4b9")
+        XCTAssertEqual(document.tokenBaselines[baselineKey]?.totalsByModel.keys.sorted() ?? [], ["gpt-5.5"])
+    }
+
     func testDailyBucketRecordTokensPerModelKeepsAggregateInvariant() {
         var bucket = AgentUsageDailyBucket(day: "2026-07-04")
 
