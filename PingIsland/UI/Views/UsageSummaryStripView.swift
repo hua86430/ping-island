@@ -6,6 +6,9 @@ struct UsageSummaryStripView: View {
         case numeric
         case battery
         case preferredBattery
+        /// One row per provider (Codex / Claude), each showing every window's
+        /// percentage plus a visible reset countdown, windows split by "|".
+        case detailedRows
     }
 
     enum BatteryHoverDetailStyle {
@@ -29,7 +32,9 @@ struct UsageSummaryStripView: View {
 
     var body: some View {
         Group {
-            if inline {
+            if case .detailedRows = displayStyle {
+                detailedRowsLayout
+            } else if inline {
                 HStack(spacing: 6) {
                     ForEach(providers) { provider in
                         providerSection(provider)
@@ -60,6 +65,46 @@ struct UsageSummaryStripView: View {
         }
     }
 
+    private var detailedRowsLayout: some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(providers) { provider in
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(provider.title)
+                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white.opacity(0.62))
+                        .frame(width: 50, alignment: .leading)
+
+                    HStack(spacing: 6) {
+                        ForEach(Array(provider.windows.enumerated()), id: \.element.id) { index, window in
+                            HStack(spacing: 4) {
+                                Text(window.label)
+                                    .foregroundColor(.white.opacity(0.5))
+
+                                Text(window.valueText)
+                                    .foregroundColor(emphasisColor(for: window.severity))
+
+                                if let resetText = window.resetText {
+                                    Text(resetText)
+                                        .foregroundColor(.white.opacity(0.4))
+                                }
+                            }
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .lineLimit(1)
+
+                            if index < provider.windows.count - 1 {
+                                Text("|")
+                                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                                    .foregroundColor(.white.opacity(0.24))
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: .infinity, alignment: alignment == .leading ? .leading : .trailing)
+    }
+
     @ViewBuilder
     private func providerSection(_ provider: UsageSummaryProvider) -> some View {
         if inline {
@@ -85,7 +130,7 @@ struct UsageSummaryStripView: View {
                             detailWindows: [window]
                         )
                     }
-                case .numeric:
+                case .numeric, .detailedRows:
                     ForEach(provider.windows, id: \.id) { window in
                         numericWindowSection(window)
                     }
@@ -302,7 +347,7 @@ private struct UsageBatteryCurrentWindowPopover: View {
         let percentage = "\(Int(max(0, window.remainingPercentage).rounded()))%"
         switch locale.language.languageCode?.identifier {
         case "zh":
-            return "剩余：\(percentage)"
+            return "剩餘：\(percentage)"
         default:
             return "Left: \(percentage)"
         }
@@ -382,7 +427,7 @@ private struct UsageBatteryDetailPopover: View {
     private var remainingLabel: String {
         switch locale.language.languageCode?.identifier {
         case "zh":
-            return "剩余:"
+            return "剩餘:"
         default:
             return "left:"
         }

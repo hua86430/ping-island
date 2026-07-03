@@ -144,7 +144,7 @@ struct NotchView: View {
     }
 
     private var openedHeaderUsageDisplayStyle: UsageSummaryStripView.DisplayStyle {
-        isOnBuiltinDisplay ? .preferredBattery : .numeric
+        .detailedRows
     }
 
     private var isOnBuiltinDisplay: Bool {

@@ -321,9 +321,19 @@ class SessionMonitor: ObservableObject {
             let cachedClaudeSnapshot = UsageSnapshotCacheStore.loadClaude()
             let cachedCodexSnapshot = UsageSnapshotCacheStore.loadCodex()
 
-            let claudeSnapshot = await Task.detached(priority: .utility) {
-                try? ClaudeUsageLoader.load()
-            }.value
+            // Claude usage only exists behind the OAuth usage endpoint (no readable
+            // file like Codex), so throttle live fetches to the cached snapshot's age
+            // (matches the status-line tooling's 180s window) to stay well clear of
+            // rate limits. Fresh cache -> skip the network and reuse it below.
+            let claudeSnapshot: ClaudeUsageSnapshot?
+            if let cachedAt = cachedClaudeSnapshot?.cachedAt,
+               Date().timeIntervalSince(cachedAt) < ClaudeUsageAPIClient.minRefreshInterval {
+                claudeSnapshot = nil
+            } else {
+                claudeSnapshot = await Task.detached(priority: .utility) {
+                    await ClaudeUsageAPIClient.fetch() ?? (try? ClaudeUsageLoader.load())
+                }.value
+            }
 
             let codexSnapshot = await Task.detached(priority: .utility) {
                 try? CodexUsageLoader.load()

@@ -120,12 +120,13 @@ enum UsageSummaryPresenter {
                     )
                 )
             }
-            if !windows.isEmpty {
+            let liveWindows = windows.filter { isLiveWindow(resetsAt: $0.resetsAt, now: now) }
+            if !liveWindows.isEmpty {
                 providers.append(
                     UsageSummaryProvider(
                         id: "claude",
                         title: "Claude",
-                        windows: windows
+                        windows: liveWindows
                     )
                 )
             }
@@ -144,18 +145,28 @@ enum UsageSummaryPresenter {
                 )
             }
 
-            if !windows.isEmpty {
+            let liveWindows = windows.filter { isLiveWindow(resetsAt: $0.resetsAt, now: now) }
+            if !liveWindows.isEmpty {
                 providers.append(
                     UsageSummaryProvider(
                         id: "codex",
                         title: "Codex",
-                        windows: windows
+                        windows: liveWindows
                     )
                 )
             }
         }
 
         return providers
+    }
+
+    /// A usage window is only meaningful while its quota window is still open. Once
+    /// `resetsAt` is in the past the quota has already reset, so the cached
+    /// percentage is stale (from the expired window) and would mislead — drop it,
+    /// which in turn hides a provider whose every window has expired.
+    private nonisolated static func isLiveWindow(resetsAt: Date?, now: Date) -> Bool {
+        guard let resetsAt else { return false }
+        return resetsAt > now
     }
 
     nonisolated static func shouldShowSummary(
@@ -209,7 +220,7 @@ enum UsageSummaryPresenter {
 
         switch locale.language.languageCode?.identifier {
         case "zh":
-            return "\(duration) 后重置"
+            return "\(duration) 後重置"
         default:
             return "Resets in \(duration)"
         }
@@ -267,7 +278,7 @@ enum UsageSummaryPresenter {
     private nonisolated static func localizedRemainingLabel(locale: Locale) -> String {
         switch locale.language.languageCode?.identifier {
         case "zh":
-            return "剩余"
+            return "剩餘"
         default:
             return "left"
         }

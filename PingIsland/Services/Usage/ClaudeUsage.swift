@@ -47,6 +47,18 @@ enum ClaudeUsageLoader {
         return snapshot.isEmpty ? nil : snapshot
     }
 
+    /// Build a snapshot from an already-parsed usage payload (e.g. the JSON body of
+    /// the `/api/oauth/usage` response), reusing the same five_hour/seven_day +
+    /// utilization/resets_at parsing as the file loader.
+    nonisolated static func snapshot(fromPayload payload: [String: Any], cachedAt: Date) -> ClaudeUsageSnapshot? {
+        let snapshot = ClaudeUsageSnapshot(
+            fiveHour: usageWindow(for: "five_hour", in: payload),
+            sevenDay: usageWindow(for: "seven_day", in: payload),
+            cachedAt: cachedAt
+        )
+        return snapshot.isEmpty ? nil : snapshot
+    }
+
     private nonisolated static func usageWindow(for key: String, in payload: [String: Any]) -> ClaudeUsageWindow? {
         guard let window = payload[key] as? [String: Any],
               let rawPercentage = number(from: window["used_percentage"])
