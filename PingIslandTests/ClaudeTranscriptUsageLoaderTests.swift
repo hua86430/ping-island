@@ -24,7 +24,12 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
 
         let snapshot = try XCTUnwrap(ClaudeTranscriptUsageLoader.load(from: transcriptURL))
 
-        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 15, output: 5, total: 20))
+        XCTAssertEqual(
+            snapshot.tokenTotals,
+            AgentUsageTokenTotals(input: 10, cacheCreation: 2, cacheRead: 3, output: 5)
+        )
+        // Consumption excludes cache reads: 10 + 2 + 5, not + 3.
+        XCTAssertEqual(snapshot.tokenTotals.resolvedTotal, 17)
         XCTAssertEqual(snapshot.sourceFilePath, transcriptURL.path)
         XCTAssertFalse(snapshot.contentHash.isEmpty)
     }
@@ -49,7 +54,7 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
 
         let snapshot = try XCTUnwrap(ClaudeTranscriptUsageLoader.load(from: transcriptURL))
 
-        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 7, output: 4, total: 11))
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 7, output: 4))
     }
 
     func testLoadParsesQoderWorkTopLevelUsage() throws {
@@ -69,7 +74,7 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
 
         let snapshot = try XCTUnwrap(ClaudeTranscriptUsageLoader.load(from: transcriptURL))
 
-        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 13, output: 8, total: 21))
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 13, output: 8))
     }
 
     func testLoadReturnsNilWhenTranscriptHasNoTokenFields() throws {
@@ -145,7 +150,7 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
         )
 
         var snapshot = await store.snapshot(range: .today, now: now)
-        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 7, output: 4, total: 11))
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 7, output: 4))
         XCTAssertEqual(snapshot.sessionCount, 1)
 
         try appendJSONLLine([
@@ -173,7 +178,7 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
         )
 
         snapshot = await store.snapshot(range: .today, now: now)
-        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 12, output: 8, total: 20))
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 12, output: 8))
         XCTAssertEqual(snapshot.sessionCount, 1)
     }
 }

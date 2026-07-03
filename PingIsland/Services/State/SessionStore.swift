@@ -2825,7 +2825,12 @@ actor SessionStore {
             capturedAt: snapshot.capturedAt ?? Date(),
             sourceFileSize: snapshot.fileSize,
             sourceContentHash: snapshot.contentHash,
-            recordInitialSnapshot: true
+            // Seed the baseline on first sight without dumping the whole transcript's
+            // cumulative totals (which are dominated by cache_read re-reads) into
+            // "today". Only growth after the app starts watching is counted — so an
+            // analytics reset, or first launch on an existing session, starts clean
+            // instead of spiking with a one-shot historical dump.
+            recordInitialSnapshot: false
         )
     }
 

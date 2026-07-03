@@ -32,30 +32,62 @@ enum AgentUsageRange: String, CaseIterable, Identifiable, Sendable {
 
 struct AgentUsageTokenTotals: Codable, Equatable, Sendable {
     var input: Int
+    var cacheCreation: Int
+    var cacheRead: Int
     var output: Int
-    var total: Int
 
-    nonisolated init(input: Int = 0, output: Int = 0, total: Int = 0) {
+    nonisolated init(input: Int = 0, cacheCreation: Int = 0, cacheRead: Int = 0, output: Int = 0) {
         self.input = max(0, input)
+        self.cacheCreation = max(0, cacheCreation)
+        self.cacheRead = max(0, cacheRead)
         self.output = max(0, output)
-        self.total = max(0, total)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case input, cacheCreation, cacheRead, output
+    }
+
+    // Custom decode tolerates the legacy {input, output, total} shape (unknown keys
+    // like `total` are ignored; missing cache fields default to 0) so old persisted
+    // data decodes without crashing before the store's schema reset wipes it.
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        input = max(0, try container.decodeIfPresent(Int.self, forKey: .input) ?? 0)
+        cacheCreation = max(0, try container.decodeIfPresent(Int.self, forKey: .cacheCreation) ?? 0)
+        cacheRead = max(0, try container.decodeIfPresent(Int.self, forKey: .cacheRead) ?? 0)
+        output = max(0, try container.decodeIfPresent(Int.self, forKey: .output) ?? 0)
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(input, forKey: .input)
+        try container.encode(cacheCreation, forKey: .cacheCreation)
+        try container.encode(cacheRead, forKey: .cacheRead)
+        try container.encode(output, forKey: .output)
     }
 
     nonisolated mutating func add(_ other: AgentUsageTokenTotals) {
         input += max(0, other.input)
+        cacheCreation += max(0, other.cacheCreation)
+        cacheRead += max(0, other.cacheRead)
         output += max(0, other.output)
-        total += max(0, other.total)
     }
 
+    // Consumption total. EXCLUDES cache reads: cache_read_input_tokens is the same
+    // cached context re-read every turn, so summing it inflates the figure into the
+    // billions and misrepresents actual usage.
     nonisolated var resolvedTotal: Int {
-        if total > 0 {
-            return total
-        }
-        return input + output
+        input + cacheCreation + output
+    }
+
+    // Input-side consumption for display: fresh input + cache writes, excluding cache
+    // re-reads. So the shown 輸入 + 輸出 adds up to the 消耗 (resolvedTotal).
+    nonisolated var displayInput: Int {
+        input + cacheCreation
     }
 
     nonisolated var hasTokens: Bool {
-        input > 0 || output > 0 || total > 0
+        input > 0 || cacheCreation > 0 || cacheRead > 0 || output > 0
     }
 }
 
@@ -155,10 +187,18 @@ struct AgentUsageTokenPricing: Equatable, Sendable {
     let inputUSDPerMillion: Double
     let outputUSDPerMillion: Double
     let label: String
+    // Cache tokens are billed relative to the input rate: writes ~1.25x, reads ~0.1x.
+    let cacheCreationMultiplier: Double = 1.25
+    let cacheReadMultiplier: Double = 0.1
 
     nonisolated func estimateUSD(for totals: AgentUsageTokenTotals) -> Double {
-        (Double(totals.input) / 1_000_000 * inputUSDPerMillion)
-            + (Double(totals.output) / 1_000_000 * outputUSDPerMillion)
+        func cost(_ tokens: Int, _ rate: Double) -> Double {
+            Double(tokens) / 1_000_000 * rate
+        }
+        return cost(totals.input, inputUSDPerMillion)
+            + cost(totals.cacheCreation, inputUSDPerMillion * cacheCreationMultiplier)
+            + cost(totals.cacheRead, inputUSDPerMillion * cacheReadMultiplier)
+            + cost(totals.output, outputUSDPerMillion)
     }
 }
 
@@ -330,7 +370,8 @@ struct CodexTokenUsage: Codable, Equatable, Sendable {
     let totalTokens: Int
 
     nonisolated var totals: AgentUsageTokenTotals {
-        AgentUsageTokenTotals(input: inputTokens, output: outputTokens, total: totalTokens)
+        // Codex rollout logs report only input/output (no cache split).
+        AgentUsageTokenTotals(input: inputTokens, output: outputTokens)
     }
 }
 
@@ -397,7 +438,13 @@ struct AgentUsageDocument: Codable, Equatable, Sendable {
         }
     }
 
+    // v2: cache_read is tracked separately and excluded from consumption/pricing.
+    // Older on-disk data summed cache_read into `input`, inflating totals into the
+    // billions, so it is discarded on load rather than migrated.
+    nonisolated static let currentSchemaVersion = 2
+
     private enum CodingKeys: String, CodingKey {
+        case schemaVersion
         case buckets
         case seenToolEventIDs
         case codexTokenBaselines
@@ -406,6 +453,18 @@ struct AgentUsageDocument: Codable, Equatable, Sendable {
 
     nonisolated init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        let version = try container.decodeIfPresent(Int.self, forKey: .schemaVersion) ?? 1
+        guard version >= Self.currentSchemaVersion else {
+            // Drop the polluted pre-v2 history. Baselines re-seed to current totals on
+            // the next transcript scan with no retroactive delta, so counts restart clean.
+            buckets = [:]
+            seenToolEventIDs = []
+            codexTokenBaselines = [:]
+            tokenBaselines = [:]
+            return
+        }
+
         buckets = try container.decodeIfPresent([String: AgentUsageDailyBucket].self, forKey: .buckets) ?? [:]
         seenToolEventIDs = try container.decodeIfPresent(Set<String>.self, forKey: .seenToolEventIDs) ?? []
         codexTokenBaselines = try container.decodeIfPresent([String: CodexTokenUsage].self, forKey: .codexTokenBaselines) ?? [:]
@@ -424,6 +483,7 @@ struct AgentUsageDocument: Codable, Equatable, Sendable {
 
     nonisolated func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(Self.currentSchemaVersion, forKey: .schemaVersion)
         try container.encode(buckets, forKey: .buckets)
         try container.encode(seenToolEventIDs, forKey: .seenToolEventIDs)
         try container.encode(codexTokenBaselines, forKey: .codexTokenBaselines)
@@ -607,8 +667,9 @@ actor AgentUsageStore {
         if let previous, !didReset {
             delta = AgentUsageTokenTotals(
                 input: max(0, currentTotals.input - previous.totals.input),
-                output: max(0, currentTotals.output - previous.totals.output),
-                total: max(0, currentTotals.total - previous.totals.total)
+                cacheCreation: max(0, currentTotals.cacheCreation - previous.totals.cacheCreation),
+                cacheRead: max(0, currentTotals.cacheRead - previous.totals.cacheRead),
+                output: max(0, currentTotals.output - previous.totals.output)
             )
         } else if recordInitialSnapshot {
             delta = currentTotals
@@ -878,8 +939,9 @@ actor AgentUsageStore {
     private nonisolated func tokenTotalsJSONObject(_ totals: AgentUsageTokenTotals) -> [String: Int] {
         [
             "input": totals.input,
+            "cacheCreation": totals.cacheCreation,
+            "cacheRead": totals.cacheRead,
             "output": totals.output,
-            "total": totals.total,
             "resolvedTotal": totals.resolvedTotal,
         ]
     }

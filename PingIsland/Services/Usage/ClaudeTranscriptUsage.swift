@@ -110,23 +110,17 @@ enum ClaudeTranscriptUsageLoader {
             ?? integer(from: payload["completion_tokens"])
             ?? integer(from: payload["completionTokens"])
             ?? 0
-        let total = integer(from: payload["total_tokens"])
-            ?? integer(from: payload["totalTokens"])
-            ?? integer(from: payload["total_token_count"])
-            ?? integer(from: payload["totalTokenCount"])
-            ?? integer(from: payload["total"])
-            ?? 0
-        let input = baseInput + cacheCreation + cacheRead
-        let resolvedTotal = total > 0 ? total : input + output
-
-        guard input > 0 || output > 0 || resolvedTotal > 0 else {
+        guard baseInput > 0 || cacheCreation > 0 || cacheRead > 0 || output > 0 else {
             return nil
         }
 
+        // Keep the four components separate: cache_read is the cached context re-read
+        // every turn, so folding it into `input` inflates totals into the billions.
         return AgentUsageTokenTotals(
-            input: input,
-            output: output,
-            total: resolvedTotal
+            input: baseInput,
+            cacheCreation: cacheCreation,
+            cacheRead: cacheRead,
+            output: output
         )
     }
 

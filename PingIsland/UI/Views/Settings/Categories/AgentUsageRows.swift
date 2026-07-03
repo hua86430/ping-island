@@ -51,7 +51,7 @@ struct AgentUsageSummaryCards: View {
             value: AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.resolvedTotal),
             subtitle: AppLocalization.format(
                 "输入 %@ / 输出 %@",
-                AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.input),
+                AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.displayInput),
                 AgentUsageFormat.compactTokenCount(snapshot.tokenTotals.output)
             ),
             trendValues: snapshot.trendPoints.map(\.tokenTotal),
@@ -395,7 +395,7 @@ struct AgentUsageTokenSplitLine: View {
         HStack(spacing: 16) {
             AgentUsageTokenPill(
                 title: "输入 Token",
-                value: AgentUsageFormat.compactTokenCount(totals.input),
+                value: AgentUsageFormat.compactTokenCount(totals.displayInput),
                 tint: TerminalColors.blue
             )
             AgentUsageTokenPill(

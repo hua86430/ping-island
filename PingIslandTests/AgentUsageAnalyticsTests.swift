@@ -28,7 +28,7 @@ final class AgentUsageAnalyticsTests: XCTestCase {
                         "Read": 3,
                         "Bash": 2,
                     ],
-                    tokenTotals: AgentUsageTokenTotals(input: 100, output: 50, total: 150),
+                    tokenTotals: AgentUsageTokenTotals(input: 100, output: 50),
                     activityCount: 8
                 ),
                 yesterday: AgentUsageDailyBucket(
@@ -39,7 +39,7 @@ final class AgentUsageAnalyticsTests: XCTestCase {
                     toolCounts: [
                         "Read": 1,
                     ],
-                    tokenTotals: AgentUsageTokenTotals(input: 40, output: 10, total: 50),
+                    tokenTotals: AgentUsageTokenTotals(input: 40, output: 10),
                     activityCount: 3
                 ),
                 older: AgentUsageDailyBucket(
@@ -50,7 +50,7 @@ final class AgentUsageAnalyticsTests: XCTestCase {
                     toolCounts: [
                         "Grep": 10,
                     ],
-                    tokenTotals: AgentUsageTokenTotals(input: 1_000, output: 1_000, total: 2_000),
+                    tokenTotals: AgentUsageTokenTotals(input: 1_000, output: 1_000),
                     activityCount: 12
                 ),
             ]
@@ -65,7 +65,7 @@ final class AgentUsageAnalyticsTests: XCTestCase {
 
         XCTAssertEqual(snapshot.sessionCount, 3)
         XCTAssertEqual(snapshot.toolUseCount, 6)
-        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 140, output: 60, total: 200))
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 140, output: 60))
         XCTAssertEqual(snapshot.topAgents.map(\.name), ["Claude Code", "Codex"])
         XCTAssertEqual(snapshot.topAgents.map(\.count), [2, 1])
         XCTAssertEqual(snapshot.topTools.map(\.name), ["Read", "Bash"])
@@ -82,12 +82,12 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(snapshot.trendPoints.last?.toolUseCount, 5)
         XCTAssertEqual(snapshot.trendPoints.last?.sessionCount, 3)
         XCTAssertEqual(snapshot.spendSummary.dailyPoints.count, 30)
-        XCTAssertEqual(snapshot.spendSummary.today.tokenTotals, AgentUsageTokenTotals(input: 100, output: 50, total: 150))
-        XCTAssertEqual(snapshot.spendSummary.sevenDays.tokenTotals, AgentUsageTokenTotals(input: 140, output: 60, total: 200))
-        XCTAssertEqual(snapshot.spendSummary.thirtyDays.tokenTotals, AgentUsageTokenTotals(input: 1_140, output: 1_060, total: 2_200))
+        XCTAssertEqual(snapshot.spendSummary.today.tokenTotals, AgentUsageTokenTotals(input: 100, output: 50))
+        XCTAssertEqual(snapshot.spendSummary.sevenDays.tokenTotals, AgentUsageTokenTotals(input: 140, output: 60))
+        XCTAssertEqual(snapshot.spendSummary.thirtyDays.tokenTotals, AgentUsageTokenTotals(input: 1_140, output: 1_060))
         XCTAssertEqual(
             snapshot.spendSummary.sevenDays.estimatedUSD,
-            AgentUsageCostEstimator.estimateUSD(for: AgentUsageTokenTotals(input: 140, output: 60, total: 200)),
+            AgentUsageCostEstimator.estimateUSD(for: AgentUsageTokenTotals(input: 140, output: 60)),
             accuracy: 0.000_001
         )
         XCTAssertEqual(snapshot.spendSummary.dailyPoints.last?.tokenTotal, 150)
@@ -95,10 +95,24 @@ final class AgentUsageAnalyticsTests: XCTestCase {
 
     func testCostEstimatorUsesBlendedCodexClaudePricing() {
         let cost = AgentUsageCostEstimator.estimateUSD(
-            for: AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000, total: 2_000_000)
+            for: AgentUsageTokenTotals(input: 1_000_000, output: 1_000_000)
         )
 
         XCTAssertEqual(cost, 16.875, accuracy: 0.000_001)
+    }
+
+    func testCostEstimatorTiersCacheTokens() {
+        // input full 2.375, cacheCreation 1.25x = 2.96875, cacheRead 0.1x = 0.2375, output 14.5.
+        let cost = AgentUsageCostEstimator.estimateUSD(
+            for: AgentUsageTokenTotals(
+                input: 1_000_000,
+                cacheCreation: 1_000_000,
+                cacheRead: 1_000_000,
+                output: 1_000_000
+            )
+        )
+
+        XCTAssertEqual(cost, 2.375 + 2.96875 + 0.2375 + 14.5, accuracy: 0.000_001)
     }
 
     func testSnapshotRankingsAreLimitedToTopFive() {
@@ -177,7 +191,7 @@ final class AgentUsageAnalyticsTests: XCTestCase {
 
         let snapshot = await store.snapshot(range: .today, now: capturedAt)
 
-        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 75, output: 30, total: 105))
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 75, output: 30))
         XCTAssertEqual(snapshot.sessionCount, 1)
     }
 }
