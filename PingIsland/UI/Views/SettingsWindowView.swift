@@ -656,11 +656,6 @@ final class SettingsPanelViewModel: ObservableObject {
     }
 }
 
-private enum SettingsPanelPresentation {
-    case window
-    case popover
-}
-
 private struct SoundSettingsContent: View {
     @ObservedObject private var settings = AppSettings.shared
     @ObservedObject private var soundPacks = SoundPackCatalog.shared
@@ -2239,18 +2234,13 @@ private enum SettingsPanelMetrics {
     static let windowSize = AppSettings.defaultSettingsWindowSize
     static let windowMinSize = AppSettings.minimumSettingsWindowSize
     static let windowMaxSize = AppSettings.maximumSettingsWindowSize
-    static let popoverSize = CGSize(width: 760, height: 620)
     static let windowSidebarWidth: CGFloat = 236
-    static let popoverSidebarWidth: CGFloat = 212
     static let windowContentTopInset: CGFloat = 0
-    static let popoverContentTopInset: CGFloat = 0
     static let outerPadding: CGFloat = 0
 }
 
 private struct SettingsPanelContentView: View {
-    let presentation: SettingsPanelPresentation
     var onClose: (() -> Void)? = nil
-    var onMinimize: (() -> Void)? = nil
 
     @StateObject private var viewModel = SettingsPanelViewModel()
     @ObservedObject private var settings = AppSettings.shared
@@ -2301,7 +2291,7 @@ private struct SettingsPanelContentView: View {
         .environment(\.mascotAnimationsEnabled, arePreviewAnimationsActive)
         .onAppear {
             viewModel.refreshInitialState()
-            let isVisible = presentation == .popover || currentWindow?.isVisible == true
+            let isVisible = currentWindow?.isVisible == true
             isAccessibilityPollingActive = isVisible
             arePreviewAnimationsActive = isVisible
 
@@ -2324,8 +2314,7 @@ private struct SettingsPanelContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .settingsWindowVisibilityDidChange)) { notification in
-            guard presentation == .window,
-                  let isVisible = notification.userInfo?[SettingsWindowVisibilityNotification.isVisibleKey] as? Bool else {
+            guard let isVisible = notification.userInfo?[SettingsWindowVisibilityNotification.isVisibleKey] as? Bool else {
                 return
             }
 
@@ -2337,8 +2326,7 @@ private struct SettingsPanelContentView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .settingsWindowCategorySelectionRequested)) { notification in
-            guard presentation == .window,
-                  let rawCategory = notification.userInfo?[SettingsWindowCategorySelectionRequest.categoryKey] as? String,
+            guard let rawCategory = notification.userInfo?[SettingsWindowCategorySelectionRequest.categoryKey] as? String,
                   let category = SettingsCategory(rawValue: rawCategory) else {
                 return
             }
@@ -2440,81 +2428,19 @@ private struct SettingsPanelContentView: View {
         }
     }
 
-    private var minimumWidth: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowMinSize.width
-        case .popover:
-            return SettingsPanelMetrics.popoverSize.width
-        }
-    }
-
-    private var maximumWidth: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowMaxSize.width
-        case .popover:
-            return SettingsPanelMetrics.popoverSize.width
-        }
-    }
-
-    private var idealWidth: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowSize.width
-        case .popover:
-            return SettingsPanelMetrics.popoverSize.width
-        }
-    }
-
-    private var minimumHeight: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowMinSize.height
-        case .popover:
-            return SettingsPanelMetrics.popoverSize.height
-        }
-    }
-
-    private var maximumHeight: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowMaxSize.height
-        case .popover:
-            return SettingsPanelMetrics.popoverSize.height
-        }
-    }
-
-    private var idealHeight: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowSize.height
-        case .popover:
-            return SettingsPanelMetrics.popoverSize.height
-        }
-    }
-
-    private var sidebarWidth: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowSidebarWidth
-        case .popover:
-            return SettingsPanelMetrics.popoverSidebarWidth
-        }
-    }
+    private var minimumWidth: CGFloat { SettingsPanelMetrics.windowMinSize.width }
+    private var maximumWidth: CGFloat { SettingsPanelMetrics.windowMaxSize.width }
+    private var idealWidth: CGFloat { SettingsPanelMetrics.windowSize.width }
+    private var minimumHeight: CGFloat { SettingsPanelMetrics.windowMinSize.height }
+    private var maximumHeight: CGFloat { SettingsPanelMetrics.windowMaxSize.height }
+    private var idealHeight: CGFloat { SettingsPanelMetrics.windowSize.height }
+    private var sidebarWidth: CGFloat { SettingsPanelMetrics.windowSidebarWidth }
 
     private var panelBackgroundColor: Color {
         .clear
     }
 
-    private var contentTopInset: CGFloat {
-        switch presentation {
-        case .window:
-            return SettingsPanelMetrics.windowContentTopInset
-        case .popover:
-            return SettingsPanelMetrics.popoverContentTopInset
-        }
-    }
+    private var contentTopInset: CGFloat { SettingsPanelMetrics.windowContentTopInset }
 
     private var sidebarSections: [SettingsSidebarSection] {
         [
@@ -2528,9 +2454,7 @@ private struct SettingsPanelContentView: View {
     private var sidebar: some View {
         ScrollView(.vertical, showsIndicators: false) {
             VStack(alignment: .leading, spacing: 18) {
-                if presentation == .window {
-                    sidebarWindowControls
-                }
+                sidebarWindowControls
 
                 ForEach(sidebarSections) { section in
                     VStack(alignment: .leading, spacing: 8) {
@@ -2638,11 +2562,7 @@ private struct SettingsPanelContentView: View {
             }
 
             WindowControlButton(color: Color(red: 1.0, green: 0.74, blue: 0.18)) {
-                if let onMinimize {
-                    onMinimize()
-                } else {
-                    currentWindow?.miniaturize(nil)
-                }
+                currentWindow?.miniaturize(nil)
             }
 
             SettingsWindowDragHandle()
@@ -3082,7 +3002,6 @@ private struct SettingsPanelContentView: View {
     }
 
     private func resetSettingsPanelSize() {
-        guard presentation == .window else { return }
         SettingsWindowLayout.resetContentSize(of: currentWindow)
     }
 
@@ -3832,25 +3751,11 @@ private struct SettingsPanelContentView: View {
 
 struct SettingsWindowView: View {
     var onClose: (() -> Void)? = nil
-    var onMinimize: (() -> Void)? = nil
 
     var body: some View {
         AppLocalizedRootView {
-            SettingsPanelContentView(
-                presentation: .window,
-                onClose: onClose,
-                onMinimize: onMinimize
-            )
-            .accessibilityIdentifier("settings.root")
-        }
-    }
-}
-
-struct NotchSettingsPopoverView: View {
-    var body: some View {
-        AppLocalizedRootView {
-            SettingsPanelContentView(presentation: .popover)
-                .frame(width: SettingsPanelMetrics.popoverSize.width, height: SettingsPanelMetrics.popoverSize.height)
+            SettingsPanelContentView(onClose: onClose)
+                .accessibilityIdentifier("settings.root")
         }
     }
 }

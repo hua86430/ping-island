@@ -123,9 +123,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         hostingController.rootView = SettingsWindowView(
             onClose: { [weak self] in
                 self?.dismiss()
-            },
-            onMinimize: { [weak self] in
-                self?.window?.miniaturize(nil)
             }
         )
     }
