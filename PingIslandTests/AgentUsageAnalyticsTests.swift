@@ -115,6 +115,19 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(cost, 2.375 + 2.96875 + 0.2375 + 14.5, accuracy: 0.000_001)
     }
 
+    func testCodexTokenUsageSplitsCachedInputTokens() {
+        // Assumption backed by local rollout samples: input_tokens INCLUDES cached_input_tokens.
+        let usage = CodexTokenUsage(inputTokens: 28_383, cachedInputTokens: 4_480, outputTokens: 424, totalTokens: 28_807)
+        XCTAssertEqual(usage.totals, AgentUsageTokenTotals(input: 23_903, cacheRead: 4_480, output: 424))
+    }
+
+    func testCodexTokenUsageLegacyDecodeDefaultsCachedToZero() throws {
+        let legacy = #"{"inputTokens":100,"outputTokens":50,"totalTokens":150}"#
+        let usage = try JSONDecoder().decode(CodexTokenUsage.self, from: Data(legacy.utf8))
+        XCTAssertEqual(usage.cachedInputTokens, 0)
+        XCTAssertEqual(usage.totals, AgentUsageTokenTotals(input: 100, output: 50))
+    }
+
     func testSnapshotRankingsAreLimitedToTopFive() {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!

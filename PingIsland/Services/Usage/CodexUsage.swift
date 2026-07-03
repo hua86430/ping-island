@@ -21,6 +21,7 @@ struct CodexUsageSnapshot: Equatable, Codable, Sendable {
     let planType: String?
     let limitID: String?
     let tokenUsage: CodexTokenUsage?
+    let model: String?
     let windows: [CodexUsageWindow]
 
     nonisolated init(
@@ -29,6 +30,7 @@ struct CodexUsageSnapshot: Equatable, Codable, Sendable {
         planType: String?,
         limitID: String?,
         tokenUsage: CodexTokenUsage? = nil,
+        model: String? = nil,
         windows: [CodexUsageWindow]
     ) {
         self.sourceFilePath = sourceFilePath
@@ -36,6 +38,7 @@ struct CodexUsageSnapshot: Equatable, Codable, Sendable {
         self.planType = planType
         self.limitID = limitID
         self.tokenUsage = tokenUsage
+        self.model = model
         self.windows = windows
     }
 
@@ -45,6 +48,7 @@ struct CodexUsageSnapshot: Equatable, Codable, Sendable {
         case planType
         case limitID
         case tokenUsage
+        case model
         case windows
     }
 
@@ -55,6 +59,7 @@ struct CodexUsageSnapshot: Equatable, Codable, Sendable {
         planType = try container.decodeIfPresent(String.self, forKey: .planType)
         limitID = try container.decodeIfPresent(String.self, forKey: .limitID)
         tokenUsage = try container.decodeIfPresent(CodexTokenUsage.self, forKey: .tokenUsage)
+        model = try container.decodeIfPresent(String.self, forKey: .model)
         windows = try container.decode([CodexUsageWindow].self, forKey: .windows)
     }
 
@@ -180,12 +185,35 @@ enum CodexUsageLoader {
             return nil
         }
 
+        let model = latestTurnContextModel(in: contents)
         for line in contents.split(separator: "\n", omittingEmptySubsequences: false).reversed() {
             if line.contains("\"token_count\""),
                line.contains("\"rate_limits\""),
-               let snapshot = snapshot(from: String(line), filePath: fileURL.path, fallbackTimestamp: modifiedAt) {
+               let snapshot = snapshot(
+                    from: String(line),
+                    filePath: fileURL.path,
+                    fallbackTimestamp: modifiedAt,
+                    model: model
+               ) {
                 return snapshot
             }
+        }
+        return nil
+    }
+
+    // A Codex thread is effectively pinned to one model; take the last turn_context in
+    // the suffix window. Some rollouts have none (observed 1 of 8 local samples) → nil.
+    private nonisolated static func latestTurnContextModel(in contents: String) -> String? {
+        for line in contents.split(separator: "\n", omittingEmptySubsequences: true).reversed() {
+            guard line.contains("\"turn_context\""),
+                  let object = jsonObject(for: String(line)),
+                  object["type"] as? String == "turn_context",
+                  let payload = object["payload"] as? [String: Any],
+                  let model = payload["model"] as? String,
+                  !model.isEmpty else {
+                continue
+            }
+            return model
         }
         return nil
     }
@@ -251,7 +279,7 @@ enum CodexUsageLoader {
         return parts.joined(separator: "\n")
     }
 
-    private nonisolated static func snapshot(from line: String, filePath: String, fallbackTimestamp: Date) -> CodexUsageSnapshot? {
+    private nonisolated static func snapshot(from line: String, filePath: String, fallbackTimestamp: Date, model: String?) -> CodexUsageSnapshot? {
         guard let object = jsonObject(for: line),
               object["type"] as? String == "event_msg" else {
             return nil
@@ -276,6 +304,7 @@ enum CodexUsageLoader {
             planType: string(from: rateLimits["plan_type"]),
             limitID: string(from: rateLimits["limit_id"]),
             tokenUsage: tokenUsage(from: payload["info"]),
+            model: model,
             windows: windows
         )
     }
@@ -403,6 +432,7 @@ enum CodexUsageLoader {
         let inputTokens = integer(from: usage["input_tokens"])
             ?? integer(from: usage["prompt_tokens"])
             ?? 0
+        let cachedInputTokens = integer(from: usage["cached_input_tokens"]) ?? 0
         let outputTokens = integer(from: usage["output_tokens"])
             ?? integer(from: usage["completion_tokens"])
             ?? 0
@@ -415,6 +445,7 @@ enum CodexUsageLoader {
 
         return CodexTokenUsage(
             inputTokens: inputTokens,
+            cachedInputTokens: cachedInputTokens,
             outputTokens: outputTokens,
             totalTokens: totalTokens
         )

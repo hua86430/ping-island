@@ -366,12 +366,39 @@ struct AgentUsageDashboardSnapshot: Equatable, Sendable {
 
 struct CodexTokenUsage: Codable, Equatable, Sendable {
     let inputTokens: Int
+    let cachedInputTokens: Int
     let outputTokens: Int
     let totalTokens: Int
 
+    nonisolated init(inputTokens: Int, cachedInputTokens: Int = 0, outputTokens: Int, totalTokens: Int) {
+        self.inputTokens = inputTokens
+        self.cachedInputTokens = cachedInputTokens
+        self.outputTokens = outputTokens
+        self.totalTokens = totalTokens
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case inputTokens, cachedInputTokens, outputTokens, totalTokens
+    }
+
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        inputTokens = try container.decodeIfPresent(Int.self, forKey: .inputTokens) ?? 0
+        cachedInputTokens = try container.decodeIfPresent(Int.self, forKey: .cachedInputTokens) ?? 0
+        outputTokens = try container.decodeIfPresent(Int.self, forKey: .outputTokens) ?? 0
+        totalTokens = try container.decodeIfPresent(Int.self, forKey: .totalTokens) ?? 0
+    }
+
     nonisolated var totals: AgentUsageTokenTotals {
-        // Codex rollout logs report only input/output (no cache split).
-        AgentUsageTokenTotals(input: inputTokens, output: outputTokens)
+        // Assumption (verified against local rollout samples, not official semantics):
+        // input_tokens INCLUDES cached_input_tokens (input + output == total, cached < input),
+        // so subtract to avoid double-counting. Cache hits are billed at the 0.1x read rate.
+        // cacheCreation stays 0: OpenAI has no cache-write surcharge.
+        AgentUsageTokenTotals(
+            input: max(0, inputTokens - cachedInputTokens),
+            cacheRead: cachedInputTokens,
+            output: outputTokens
+        )
     }
 }
 

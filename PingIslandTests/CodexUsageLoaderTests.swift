@@ -339,6 +339,103 @@ final class CodexUsageLoaderTests: XCTestCase {
 
         XCTAssertNil(snapshot.threadID)
     }
+
+    func testLoadCapturesCachedInputTokensAndLatestTurnContextModel() throws {
+        let rootURL = temporaryRootURL(named: "codex-usage-model")
+        let rolloutURL = rootURL
+            .appendingPathComponent("2026/07/04", isDirectory: true)
+            .appendingPathComponent("rollout-model.jsonl")
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        try writeRollout(
+            [
+                rolloutLine(
+                    timestamp: "2026-07-04T00:00:00.000Z",
+                    type: "turn_context",
+                    payload: ["model": "gpt-5.5", "cwd": "/tmp/example-project"]
+                ),
+                rolloutLine(
+                    timestamp: "2026-07-04T00:01:00.000Z",
+                    type: "event_msg",
+                    payload: [
+                        "type": "token_count",
+                        "info": [
+                            "total_token_usage": [
+                                "input_tokens": 28_383,
+                                "cached_input_tokens": 4_480,
+                                "output_tokens": 424,
+                                "total_tokens": 28_807,
+                            ],
+                        ],
+                        "rate_limits": [
+                            "primary": [
+                                "used_percent": 10.0,
+                                "window_minutes": 300,
+                            ],
+                        ],
+                    ]
+                ),
+            ],
+            to: rolloutURL
+        )
+
+        let snapshot = try CodexUsageLoader.load(fromRootURL: rootURL)
+
+        XCTAssertEqual(snapshot?.model, "gpt-5.5")
+        XCTAssertEqual(snapshot?.tokenUsage?.cachedInputTokens, 4_480)
+        XCTAssertEqual(
+            snapshot?.tokenUsage?.totals,
+            AgentUsageTokenTotals(input: 23_903, cacheRead: 4_480, output: 424)
+        )
+    }
+
+    func testLoadModelIsNilWhenRolloutHasNoTurnContext() throws {
+        let rootURL = temporaryRootURL(named: "codex-usage-no-turn-context")
+        let rolloutURL = rootURL
+            .appendingPathComponent("2026/07/04", isDirectory: true)
+            .appendingPathComponent("rollout-no-context.jsonl")
+        defer { try? FileManager.default.removeItem(at: rootURL) }
+
+        try writeRollout(
+            [
+                rolloutLine(
+                    timestamp: "2026-07-04T00:01:00.000Z",
+                    type: "event_msg",
+                    payload: [
+                        "type": "token_count",
+                        "rate_limits": [
+                            "primary": ["used_percent": 10.0, "window_minutes": 300],
+                        ],
+                    ]
+                ),
+            ],
+            to: rolloutURL
+        )
+
+        let snapshot = try CodexUsageLoader.load(fromRootURL: rootURL)
+
+        XCTAssertNotNil(snapshot)
+        XCTAssertNil(snapshot?.model)
+    }
+
+    func testSnapshotCodableRoundTripsModelAndToleratesLegacyJSON() throws {
+        let snapshot = CodexUsageSnapshot(
+            sourceFilePath: "/tmp/rollout-x.jsonl",
+            capturedAt: nil,
+            planType: "pro",
+            limitID: "codex",
+            tokenUsage: nil,
+            model: "gpt-5.5",
+            windows: []
+        )
+        let data = try JSONEncoder().encode(snapshot)
+        let decoded = try JSONDecoder().decode(CodexUsageSnapshot.self, from: data)
+        XCTAssertEqual(decoded.model, "gpt-5.5")
+
+        let legacy = #"{"sourceFilePath":"/tmp/rollout-x.jsonl","windows":[]}"#
+        let legacyDecoded = try JSONDecoder().decode(CodexUsageSnapshot.self, from: Data(legacy.utf8))
+        XCTAssertNil(legacyDecoded.model)
+    }
 }
 
 private func temporaryRootURL(named name: String) -> URL {
