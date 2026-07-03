@@ -42,6 +42,10 @@ final class NotchHoverSensorWindow: NSPanel {
         }
         setFrame(rect, display: false)
         if !isVisible { orderFrontRegardless() }
+        // macOS 26 re-derives a window shadow after show despite hasShadow = false;
+        // re-assert so the near-transparent sensor never casts a shadow near the notch.
+        hasShadow = false
+        invalidateShadow()
         if rect.contains(NSEvent.mouseLocation) {
             sensorView.onEnter()
         }

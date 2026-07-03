@@ -33,7 +33,14 @@ final class IslandPresentationCoordinator {
             menuBarHeight: geometry.menuBarHeight
         )
         dockedWindowController?.moveToScreen(screen)
-        applySurfaceMode(AppSettings.surfaceMode, performBootAnimation: false)
+        // Cursor-follow migration must stay cheap: an existing docked notch is just
+        // repositioned above. Only (re)apply the surface mode when there is no docked
+        // window yet or the active surface is the floating pet, so a screen change
+        // never rebuilds the notch — the rebuild leaked one hover-sensor panel per
+        // migration, and each leaked panel stacked a faint shadow around the notch.
+        if AppSettings.surfaceMode == .floatingPet || dockedWindowController == nil {
+            applySurfaceMode(AppSettings.surfaceMode, performBootAnimation: false)
+        }
     }
 
     func beginDetachment(from request: IslandDetachmentRequest) {
@@ -128,8 +135,7 @@ final class IslandPresentationCoordinator {
         activeDetachmentPayload = nil
         detachedWindowController?.dismiss()
         detachedWindowController = nil
-        dockedWindowController?.window?.orderOut(nil)
-        dockedWindowController?.close()
+        dockedWindowController?.teardown()
         dockedWindowController = nil
     }
 
@@ -245,8 +251,7 @@ final class IslandPresentationCoordinator {
     }
 
     private func recreateDockedWindow(performBootAnimation: Bool) {
-        dockedWindowController?.window?.orderOut(nil)
-        dockedWindowController?.close()
+        dockedWindowController?.teardown()
 
         let controller = NotchWindowController(
             screen: screen,

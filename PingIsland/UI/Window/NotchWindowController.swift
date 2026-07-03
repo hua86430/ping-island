@@ -60,6 +60,12 @@ class NotchWindowController: NSWindowController {
 
         notchWindow.setFrame(windowFrame, display: true)
 
+        // macOS 26 re-derives a content-shaped window shadow after the content view
+        // and frame are set, ignoring the `hasShadow = false` from NotchPanel.init().
+        // Re-assert it and invalidate so the transparent notch panel stays shadowless.
+        notchWindow.hasShadow = false
+        notchWindow.invalidateShadow()
+
         // Hover-sensor window: drives idle-independent hover-open (click/drag
         // still ride the local NSEvent monitor into handleMouseDown).
         hoverSensor = NotchHoverSensorWindow(
@@ -222,6 +228,15 @@ class NotchWindowController: NSWindowController {
         case .closed, .popping:
             window.ignoresMouseEvents = true
         }
+
+        // macOS 26 re-derives a content-shaped window shadow from the opaque pill
+        // after the SwiftUI content renders (which happens on the next runloop pass,
+        // after this method returns), so a one-shot invalidate at init leaves a faint
+        // residual. Re-assert once content has drawn on every presentation update.
+        DispatchQueue.main.async { [weak window] in
+            window?.hasShadow = false
+            window?.invalidateShadow()
+        }
     }
 
     /// Reposition the existing window onto a different screen without rebuilding it.
@@ -230,5 +245,17 @@ class NotchWindowController: NSWindowController {
         guard frame != fullWindowFrame else { return }
         fullWindowFrame = frame
         window?.setFrame(frame, display: true)
+    }
+
+    /// Close the notch window AND its hover-sensor panel. Callers must use this
+    /// (not `close()`) before dropping the controller: the sensor is a separate
+    /// ordered-in NSPanel that AppKit keeps on screen after the controller is
+    /// released, so skipping it leaks one sensor window per rebuild — and each
+    /// leaked panel stacks a faint shadow around the notch on macOS 26.
+    func teardown() {
+        hoverSensor?.orderOut(nil)
+        hoverSensor?.close()
+        window?.orderOut(nil)
+        close()
     }
 }
