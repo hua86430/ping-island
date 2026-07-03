@@ -98,7 +98,10 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         )
 
         window.contentViewController = hostingController
-        hostingController.safeAreaRegions = []
+        // Let the native titlebar safe area flow through to SwiftUI (content auto-insets
+        // below the traffic lights instead of being manually padded), and stop the
+        // hosting controller from resizing the window to the content's ideal height.
+        hostingController.sizingOptions = []
         window.title = ""
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true

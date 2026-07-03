@@ -44,15 +44,6 @@ struct SettingsRootView: View {
         }
         .navigationSplitViewStyle(.balanced)
         .toolbar(removing: .sidebarToggle)
-        .ignoresSafeArea(.container, edges: .top)
-        .frame(
-            minWidth: SettingsPanelMetrics.windowMinSize.width,
-            idealWidth: SettingsPanelMetrics.windowSize.width,
-            maxWidth: SettingsPanelMetrics.windowMaxSize.width,
-            minHeight: SettingsPanelMetrics.windowMinSize.height,
-            idealHeight: SettingsPanelMetrics.windowSize.height,
-            maxHeight: SettingsPanelMetrics.windowMaxSize.height
-        )
         .preferredColorScheme(.dark)
         .environment(\.mascotAnimationsEnabled, arePreviewAnimationsActive)
         .onAppear {
