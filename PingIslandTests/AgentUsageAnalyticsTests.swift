@@ -243,4 +243,171 @@ final class AgentUsageAnalyticsTests: XCTestCase {
         XCTAssertEqual(bucket.tokenTotals, AgentUsageTokenTotals(input: 10, output: 5))
         XCTAssertEqual(bucket.activityCount, 2)
     }
+
+    func testLegacyBaselineShapeDecodesToEmptyPerModelMap() throws {
+        let legacy = #"{"totals":{"input":10,"cacheCreation":0,"cacheRead":0,"output":5},"fileSize":128,"contentHash":"abc"}"#
+        let baseline = try JSONDecoder().decode(AgentUsageTokenSourceBaseline.self, from: Data(legacy.utf8))
+        XCTAssertEqual(baseline.totalsByModel, [:])
+        XCTAssertEqual(baseline.fileSize, 128)
+        XCTAssertEqual(baseline.contentHash, "abc")
+    }
+
+    func testCodexLegacyBaselineMigrationSeedsEmptyPerModelMap() throws {
+        // fable5 1b: migrating codexTokenBaselines must NOT seed an "unknown" key,
+        // otherwise the first real-model scan sees a missing key and dumps in full.
+        let json = """
+        {"schemaVersion":2,"buckets":{},"seenToolEventIDs":[],"codexTokenBaselines":{"thread-1":{"inputTokens":100,"outputTokens":50,"totalTokens":150}},"tokenBaselines":{}}
+        """
+        let document = try JSONDecoder().decode(AgentUsageDocument.self, from: Data(json.utf8))
+        XCTAssertEqual(document.tokenBaselines["codex|thread-1"]?.totalsByModel, [:])
+    }
+
+    func testRecordTokenUsageSeedsWithoutCountingThenCountsPerModelDelta() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ping-island-per-model-delta-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directoryURL.appendingPathComponent("usage.json")
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_775_520_000)
+        let store = AgentUsageStore(fileURL: fileURL, calendar: calendar)
+        let clientInfo = SessionClientInfo(
+            kind: .claudeCode,
+            profileID: "claude",
+            name: "Claude Code",
+            sessionFilePath: "/tmp/example/session.jsonl"
+        )
+        let sourceKey = "transcript|claude|session-1|/tmp/example/session.jsonl"
+
+        // first sight + recordInitialSnapshot:false → seed only, nothing counted
+        await store.recordTokenUsage(
+            provider: .claude,
+            clientInfo: clientInfo,
+            sessionID: "session-1",
+            sourceKey: sourceKey,
+            totalsByModel: ["opus-4.8": AgentUsageTokenTotals(input: 100, output: 40)],
+            capturedAt: now,
+            sourceFileSize: 100,
+            recordInitialSnapshot: false
+        )
+        var snapshot = await store.snapshot(range: .today, now: now)
+        XCTAssertEqual(snapshot.tokenTotals.resolvedTotal, 0)
+
+        // growth on an existing key = per-model delta; a NEW key against a non-empty
+        // baseline (mid-source subagent model) is counted in full
+        await store.recordTokenUsage(
+            provider: .claude,
+            clientInfo: clientInfo,
+            sessionID: "session-1",
+            sourceKey: sourceKey,
+            totalsByModel: [
+                "opus-4.8": AgentUsageTokenTotals(input: 160, output: 70),
+                "haiku-4.5": AgentUsageTokenTotals(input: 30, output: 12),
+            ],
+            capturedAt: now,
+            sourceFileSize: 200,
+            recordInitialSnapshot: false
+        )
+        snapshot = await store.snapshot(range: .today, now: now)
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 90, output: 42))
+
+        await store.flush()
+        let document = try JSONDecoder().decode(AgentUsageDocument.self, from: Data(contentsOf: fileURL))
+        let bucket = try XCTUnwrap(document.buckets[AgentUsageStore.dayKey(for: now, calendar: calendar)])
+        XCTAssertEqual(bucket.tokenTotalsByModel["opus-4.8"], AgentUsageTokenTotals(input: 60, output: 30))
+        XCTAssertEqual(bucket.tokenTotalsByModel["haiku-4.5"], AgentUsageTokenTotals(input: 30, output: 12))
+        var summed = AgentUsageTokenTotals()
+        for totals in bucket.tokenTotalsByModel.values { summed.add(totals) }
+        XCTAssertEqual(bucket.tokenTotals, summed)
+    }
+
+    func testRecordTokenUsageFileShrinkReseedsAllModelsWithoutCounting() async throws {
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ping-island-per-model-reset-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directoryURL.appendingPathComponent("usage.json")
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_775_520_000)
+        let store = AgentUsageStore(fileURL: fileURL, calendar: calendar)
+        let clientInfo = SessionClientInfo(
+            kind: .claudeCode,
+            profileID: "claude",
+            name: "Claude Code",
+            sessionFilePath: "/tmp/example/session.jsonl"
+        )
+        let sourceKey = "transcript|claude|session-2|/tmp/example/session.jsonl"
+
+        await store.recordTokenUsage(
+            provider: .claude, clientInfo: clientInfo, sessionID: "session-2",
+            sourceKey: sourceKey,
+            totalsByModel: ["opus-4.8": AgentUsageTokenTotals(input: 500, output: 200)],
+            capturedAt: now, sourceFileSize: 500, recordInitialSnapshot: false
+        )
+        // file shrank (session restart / truncation): reset, re-seed only
+        await store.recordTokenUsage(
+            provider: .claude, clientInfo: clientInfo, sessionID: "session-2",
+            sourceKey: sourceKey,
+            totalsByModel: ["opus-4.8": AgentUsageTokenTotals(input: 50, output: 20)],
+            capturedAt: now, sourceFileSize: 100, recordInitialSnapshot: false
+        )
+        var snapshot = await store.snapshot(range: .today, now: now)
+        XCTAssertEqual(snapshot.tokenTotals.resolvedTotal, 0)
+
+        // growth after re-seed counts against the reset baseline
+        await store.recordTokenUsage(
+            provider: .claude, clientInfo: clientInfo, sessionID: "session-2",
+            sourceKey: sourceKey,
+            totalsByModel: ["opus-4.8": AgentUsageTokenTotals(input: 80, output: 30)],
+            capturedAt: now, sourceFileSize: 160, recordInitialSnapshot: false
+        )
+        snapshot = await store.snapshot(range: .today, now: now)
+        XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 30, output: 10))
+    }
+
+    func testLegacyDocumentOnDiskDoesNotDumpHistoryOnFirstScan() async throws {
+        // The core "no history dump" guarantee via the real disk path: a legacy-shape
+        // document (baseline with the old aggregate `totals` key, no `totalsByModel`)
+        // decodes to an empty per-model map, so the next recordInitialSnapshot:false scan
+        // takes the first-sight branch (previous != nil but totalsByModel.isEmpty) and
+        // only re-seeds — today's bucket stays 0 instead of dumping the whole transcript.
+        let directoryURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ping-island-legacy-doc-\(UUID().uuidString)", isDirectory: true)
+        let fileURL = directoryURL.appendingPathComponent("usage.json")
+        try FileManager.default.createDirectory(at: directoryURL, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directoryURL) }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let now = Date(timeIntervalSince1970: 1_775_520_000)
+        let sourceKey = "transcript|claude|legacy-session|/tmp/example/session.jsonl"
+
+        // Hand-write a legacy document: baseline stored the pre-upgrade `totals` shape.
+        let legacyDocumentJSON = """
+        {"schemaVersion":2,"buckets":{},"seenToolEventIDs":[],"codexTokenBaselines":{},"tokenBaselines":{"\(sourceKey)":{"totals":{"input":900000,"cacheCreation":0,"cacheRead":5000000,"output":300000},"fileSize":4096,"contentHash":"legacy"}}}
+        """
+        try Data(legacyDocumentJSON.utf8).write(to: fileURL)
+
+        let store = AgentUsageStore(fileURL: fileURL, calendar: calendar)
+        let clientInfo = SessionClientInfo(
+            kind: .claudeCode,
+            profileID: "claude",
+            name: "Claude Code",
+            sessionFilePath: "/tmp/example/session.jsonl"
+        )
+
+        // First scan after upgrade: baseline exists but its totalsByModel is empty →
+        // first-sight, recordInitialSnapshot:false → seed only, nothing counted.
+        await store.recordTokenUsage(
+            provider: .claude, clientInfo: clientInfo, sessionID: "legacy-session",
+            sourceKey: sourceKey,
+            totalsByModel: ["opus-4.8": AgentUsageTokenTotals(input: 950_000, cacheRead: 5_100_000, output: 320_000)],
+            capturedAt: now, sourceFileSize: 5_000, recordInitialSnapshot: false
+        )
+
+        let snapshot = await store.snapshot(range: .today, now: now)
+        XCTAssertEqual(snapshot.tokenTotals.resolvedTotal, 0, "legacy baseline must re-seed, not dump history")
+    }
 }

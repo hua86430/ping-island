@@ -133,7 +133,7 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
             clientInfo: clientInfo,
             sessionID: "qoder-session",
             sourceKey: sourceKey,
-            totals: firstSnapshot.tokenTotals,
+            totalsByModel: firstSnapshot.tokenTotalsByModel,
             capturedAt: firstSnapshot.capturedAt ?? now,
             sourceFileSize: firstSnapshot.fileSize,
             sourceContentHash: firstSnapshot.contentHash
@@ -143,7 +143,7 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
             clientInfo: clientInfo,
             sessionID: "qoder-session",
             sourceKey: sourceKey,
-            totals: firstSnapshot.tokenTotals,
+            totalsByModel: firstSnapshot.tokenTotalsByModel,
             capturedAt: firstSnapshot.capturedAt ?? now,
             sourceFileSize: firstSnapshot.fileSize,
             sourceContentHash: firstSnapshot.contentHash
@@ -171,7 +171,7 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
             clientInfo: clientInfo,
             sessionID: "qoder-session",
             sourceKey: sourceKey,
-            totals: secondSnapshot.tokenTotals,
+            totalsByModel: secondSnapshot.tokenTotalsByModel,
             capturedAt: secondSnapshot.capturedAt ?? now,
             sourceFileSize: secondSnapshot.fileSize,
             sourceContentHash: secondSnapshot.contentHash

@@ -92,18 +92,35 @@ struct AgentUsageTokenTotals: Codable, Equatable, Sendable {
 }
 
 struct AgentUsageTokenSourceBaseline: Codable, Equatable, Sendable {
-    var totals: AgentUsageTokenTotals
+    var totalsByModel: [String: AgentUsageTokenTotals]
     var fileSize: UInt64?
     var contentHash: String?
 
     nonisolated init(
-        totals: AgentUsageTokenTotals,
+        totalsByModel: [String: AgentUsageTokenTotals],
         fileSize: UInt64? = nil,
         contentHash: String? = nil
     ) {
-        self.totals = totals
+        self.totalsByModel = totalsByModel
         self.fileSize = fileSize
         self.contentHash = contentHash
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case totalsByModel, fileSize, contentHash
+    }
+
+    // Legacy shape stored a single aggregate `totals`: decode it as an EMPTY map so the
+    // next scan takes the first-sight branch and re-seeds per model without dumping
+    // history (Claude/Codex callers use recordInitialSnapshot:false). No schemaVersion
+    // bump, no data wipe. Downgrade note: an older app decoding the new shape fails on
+    // the missing non-optional `totals` and loads an empty document; downgrades are
+    // not a supported scenario.
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        totalsByModel = try container.decodeIfPresent([String: AgentUsageTokenTotals].self, forKey: .totalsByModel) ?? [:]
+        fileSize = try container.decodeIfPresent(UInt64.self, forKey: .fileSize)
+        contentHash = try container.decodeIfPresent(String.self, forKey: .contentHash)
     }
 }
 
@@ -452,13 +469,6 @@ struct AgentUsageDailyBucket: Codable, Equatable, Sendable {
         activityCount += 1
     }
 
-    nonisolated mutating func recordTokens(_ totals: AgentUsageTokenTotals) {
-        tokenTotals.add(totals)
-        if totals.resolvedTotal > 0 {
-            activityCount += 1
-        }
-    }
-
     // Invariant: tokenTotals always equals the sum of tokenTotalsByModel values for
     // data written through this method.
     nonisolated mutating func recordTokens(perModel deltasByModel: [String: AgentUsageTokenTotals]) {
@@ -491,10 +501,12 @@ struct AgentUsageDocument: Codable, Equatable, Sendable {
         self.seenToolEventIDs = seenToolEventIDs
         self.codexTokenBaselines = codexTokenBaselines
         self.tokenBaselines = tokenBaselines
-        for (sourceKey, usage) in codexTokenBaselines {
+        for (sourceKey, _) in codexTokenBaselines {
             let migratedKey = Self.codexTokenSourceKey(sourceKey)
             if !self.tokenBaselines.keys.contains(migratedKey) {
-                self.tokenBaselines[migratedKey] = AgentUsageTokenSourceBaseline(totals: usage.totals)
+                // Empty map = first-sight branch on next scan; never seed an "unknown"
+                // key here or the first real-model scan would double count (fable5 1b).
+                self.tokenBaselines[migratedKey] = AgentUsageTokenSourceBaseline(totalsByModel: [:])
             }
         }
     }
@@ -534,10 +546,12 @@ struct AgentUsageDocument: Codable, Equatable, Sendable {
             forKey: .tokenBaselines
         ) ?? [:]
 
-        for (sourceKey, usage) in codexTokenBaselines {
+        for (sourceKey, _) in codexTokenBaselines {
             let migratedKey = Self.codexTokenSourceKey(sourceKey)
             if !tokenBaselines.keys.contains(migratedKey) {
-                tokenBaselines[migratedKey] = AgentUsageTokenSourceBaseline(totals: usage.totals)
+                // Empty map = first-sight branch on next scan; never seed an "unknown"
+                // key here or the first real-model scan would double count (fable5 1b).
+                tokenBaselines[migratedKey] = AgentUsageTokenSourceBaseline(totalsByModel: [:])
             }
         }
     }
@@ -680,12 +694,30 @@ actor AgentUsageStore {
         }
 
         let sourceKey = snapshot.threadID ?? snapshot.sourceFilePath
+        let baselineKey = AgentUsageDocument.codexTokenSourceKey(sourceKey)
+
+        // Key stability (fable5 3b): a Codex thread is pinned to one model, but a scan
+        // may miss the turn_context (model == nil). Reuse the baseline's sole key so the
+        // map key never flips nil <-> model and double counts the thread. Only when there
+        // is no previous key either does it fall back to "unknown". (loadDocument() is
+        // cached, so reading the baseline first is cheap.)
+        let existingBaseline = await loadDocument().tokenBaselines[baselineKey]
+        let modelKey: String
+        if let model = snapshot.model {
+            modelKey = AgentUsageModelPricing.normalizedKey(forModel: model)
+        } else if existingBaseline?.totalsByModel.count == 1,
+                  let soleKey = existingBaseline?.totalsByModel.keys.first {
+            modelKey = soleKey
+        } else {
+            modelKey = AgentUsageModelPricing.normalizedKey(forModel: nil)
+        }
+
         await recordTokenUsage(
             provider: .codex,
             clientInfo: .codexCLI(),
             sessionID: snapshot.threadID,
-            sourceKey: AgentUsageDocument.codexTokenSourceKey(sourceKey),
-            totals: currentUsage.totals,
+            sourceKey: baselineKey,
+            totalsByModel: [modelKey: currentUsage.totals],
             capturedAt: snapshot.capturedAt ?? now,
             recordInitialSnapshot: false
         )
@@ -701,14 +733,14 @@ actor AgentUsageStore {
         clientInfo: SessionClientInfo,
         sessionID: String?,
         sourceKey: String,
-        totals currentTotals: AgentUsageTokenTotals,
+        totalsByModel currentTotalsByModel: [String: AgentUsageTokenTotals],
         capturedAt: Date,
         sourceFileSize: UInt64? = nil,
         sourceContentHash: String? = nil,
         recordInitialSnapshot: Bool = true,
         now: Date = Date()
     ) async {
-        guard currentTotals.hasTokens else {
+        guard currentTotalsByModel.values.contains(where: \.hasTokens) else {
             return
         }
 
@@ -719,28 +751,41 @@ actor AgentUsageStore {
             currentFileSize: sourceFileSize
         )
         document.tokenBaselines[sourceKey] = AgentUsageTokenSourceBaseline(
-            totals: currentTotals,
+            totalsByModel: currentTotalsByModel,
             fileSize: sourceFileSize,
             contentHash: sourceContentHash
         )
 
-        let delta: AgentUsageTokenTotals
-        if let previous, !didReset {
-            delta = AgentUsageTokenTotals(
-                input: max(0, currentTotals.input - previous.totals.input),
-                cacheCreation: max(0, currentTotals.cacheCreation - previous.totals.cacheCreation),
-                cacheRead: max(0, currentTotals.cacheRead - previous.totals.cacheRead),
-                output: max(0, currentTotals.output - previous.totals.output)
-            )
+        let deltasByModel: [String: AgentUsageTokenTotals]
+        if let previous, !previous.totalsByModel.isEmpty, !didReset {
+            // Per-model delta. A key missing from a NON-empty baseline is a model that
+            // appeared mid-source (e.g. a subagent on haiku): count it in full. This is
+            // distinct from the empty-map first-sight branch below; do not merge them.
+            var deltas: [String: AgentUsageTokenTotals] = [:]
+            for (model, current) in currentTotalsByModel {
+                if let base = previous.totalsByModel[model] {
+                    deltas[model] = AgentUsageTokenTotals(
+                        input: max(0, current.input - base.input),
+                        cacheCreation: max(0, current.cacheCreation - base.cacheCreation),
+                        cacheRead: max(0, current.cacheRead - base.cacheRead),
+                        output: max(0, current.output - base.output)
+                    )
+                } else {
+                    deltas[model] = current
+                }
+            }
+            deltasByModel = deltas
         } else if recordInitialSnapshot {
-            delta = currentTotals
+            // First sight of the whole source (nil baseline, legacy empty map, or reset).
+            deltasByModel = currentTotalsByModel
         } else {
+            // Seed the baseline only; counting starts from the next scan.
             self.document = document
             scheduleSave()
             return
         }
 
-        guard delta.hasTokens else {
+        guard deltasByModel.values.contains(where: \.hasTokens) else {
             self.document = document
             scheduleSave()
             return
@@ -754,7 +799,7 @@ actor AgentUsageStore {
                 sessionID: sessionID
             )
         }
-        bucket.recordTokens(delta)
+        bucket.recordTokens(perModel: deltasByModel)
         document.buckets[day] = bucket
         pruneDocument(&document, now: now)
         self.document = document

@@ -2821,7 +2821,7 @@ actor SessionStore {
             clientInfo: session.clientInfo,
             sessionID: session.sessionId,
             sourceKey: transcriptUsageSourceKey(session: session, sourceFilePath: snapshot.sourceFilePath),
-            totals: snapshot.tokenTotals,
+            totalsByModel: snapshot.tokenTotalsByModel,
             capturedAt: snapshot.capturedAt ?? Date(),
             sourceFileSize: snapshot.fileSize,
             sourceContentHash: snapshot.contentHash,
