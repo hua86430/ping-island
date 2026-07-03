@@ -468,7 +468,7 @@
 
 **Files**
 
-- Create: `PingIsland/UI/Views/Settings/Categories/DisplaySettingsView.swift`（來源：`displayContent` 2912–3082、`resetSettingsPanelSize` 3084–3087（callsite 3077）、`replayNotchDetachmentHint` 3089–3097（callsite 2951）、display 專用子 view 群 6095–6660：`ClosedNotchTrailingContentPicker` 6110、`FloatingPetSizeModePicker` 6128、`IslandSurfaceModeSelector` 6144、`IslandSurfaceModeCard` 6180、`IslandSurfaceModePreviewScene` 6198、`DisplayPreviewMascotPicker` 6389、`FloatingPetPlacementInfoCard` 6415、`NotchDisplayPreviewMock` 6432、`NotchDisplayModeSelector` 6496、`NotchDisplayModeCard` 6526）
+- Create: `PingIsland/UI/Views/Settings/Categories/DisplaySettingsView.swift`（來源：`displayContent` 2912–3082、`resetSettingsPanelSize` 3084–3087（callsite 3077）、`replayNotchDetachmentHint` 3089–3097（callsite 2951）、display 專用子 view 群 6095–6660：`ClosedNotchTrailingContentPicker` 6110、`FloatingPetSizeModePicker` 6128、`IslandSurfaceModeSelector` 6144、`IslandSurfaceModeCard` 6180、`IslandSurfaceModePreviewScene` 6198、`DisplayPreviewMascotPicker` 6389、`FloatingPetPlacementInfoCard` 6415、`NotchDisplayPreviewMock` 6432、`NotchDisplayModeSelector` 6496、`NotchDisplayModeCard` 6526、`SubagentVisibilityPicker`、`UsageValueModePicker`（後兩者實作時發現 displayContent 有引用、原表遺漏，callsite 僅 display，隨本檔搬遷））
 - Modify: `PingIsland/UI/Views/SettingsWindowView.swift`（刪上述；`case .display: displayContent` → `case .display: DisplaySettingsView(viewModel: viewModel, onClose: onClose)`）
 
 **Interfaces**
