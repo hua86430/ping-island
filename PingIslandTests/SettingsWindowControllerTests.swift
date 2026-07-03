@@ -84,8 +84,11 @@ final class SettingsWindowControllerTests: XCTestCase {
         XCTAssertTrue(window.isVisible)
         XCTAssertFalse(window.isMiniaturized)
         XCTAssertTrue(window.isMovableByWindowBackground)
-        XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size.width, SettingsWindowDefaults.defaultContentSize.width)
-        XCTAssertEqual(window.contentRect(forFrameRect: window.frame).size.height, SettingsWindowDefaults.defaultContentSize.height)
+        // Native titled + fullSizeContentView: the content view fills the frame,
+        // so assert on the frame size (width is unaffected; height includes the
+        // transparent titlebar) instead of contentRect, which subtracts it.
+        XCTAssertEqual(window.frame.size.width, SettingsWindowDefaults.defaultContentSize.width)
+        XCTAssertGreaterThanOrEqual(window.frame.size.height, SettingsWindowDefaults.defaultContentSize.height)
 
         controller.present()
 

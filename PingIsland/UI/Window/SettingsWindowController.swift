@@ -92,19 +92,22 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         )
         let window = SettingsPanelWindow(
             contentRect: NSRect(origin: .zero, size: defaultContentSize),
-            styleMask: [.borderless, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
 
         window.contentViewController = hostingController
+        // Let the native titlebar safe area flow through to SwiftUI (content auto-insets
+        // below the traffic lights instead of being manually padded), and stop the
+        // hosting controller from resizing the window to the content's ideal height.
+        hostingController.sizingOptions = []
         window.title = ""
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.hasShadow = false
         window.minSize = minimumContentSize
         window.maxSize = maximumContentSize
         window.setContentSize(defaultContentSize)
@@ -123,9 +126,6 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         hostingController.rootView = SettingsWindowView(
             onClose: { [weak self] in
                 self?.dismiss()
-            },
-            onMinimize: { [weak self] in
-                self?.window?.miniaturize(nil)
             }
         )
     }

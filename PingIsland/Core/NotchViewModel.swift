@@ -51,7 +51,6 @@ class NotchViewModel: ObservableObject {
     @Published private(set) var isFullscreenBrowserHiddenActive = false
     @Published private(set) var isIdleAutoHiddenActive = false
     @Published private(set) var isQuietBackgroundPresentationActive = false
-    @Published private(set) var isSettingsPopoverPresented = false
     @Published private(set) var isInlineTextInputActive = false
 
     // MARK: - Geometry
@@ -117,14 +116,12 @@ class NotchViewModel: ObservableObject {
         isHovering: Bool,
         status: NotchStatus,
         openReason: NotchOpenReason,
-        isSettingsPopoverPresented: Bool,
         isInlineTextInputActive: Bool,
         autoCollapseOnLeave: Bool
     ) -> Bool {
         !isHovering
             && status == .opened
             && openReason == .hover
-            && !isSettingsPopoverPresented
             && !isInlineTextInputActive
             && autoCollapseOnLeave
     }
@@ -532,10 +529,6 @@ class NotchViewModel: ObservableObject {
     private func handleMouseDown(_ event: NSEvent) {
         guard presentationMode == .docked else { return }
 
-        if isSettingsPopoverPresented {
-            return
-        }
-
         if MouseEventReplay.isReplayed(event) {
             return
         }
@@ -862,7 +855,6 @@ class NotchViewModel: ObservableObject {
             isHovering: false,
             status: status,
             openReason: openReason,
-            isSettingsPopoverPresented: isSettingsPopoverPresented,
             isInlineTextInputActive: isInlineTextInputActive,
             autoCollapseOnLeave: AppSettings.autoCollapseOnLeave
         ) {
@@ -930,10 +922,6 @@ class NotchViewModel: ObservableObject {
     func notchUnpop() {
         guard status == .popping else { return }
         status = .closed
-    }
-
-    func setSettingsPopoverPresented(_ isPresented: Bool) {
-        isSettingsPopoverPresented = isPresented
     }
 
     func setInlineTextInputActive(_ isActive: Bool) {
