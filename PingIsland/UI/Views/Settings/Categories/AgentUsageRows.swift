@@ -182,6 +182,7 @@ struct AgentUsageSummaryCard: View {
 
 struct AgentUsageSpendPanel: View {
     let summary: AgentUsageSpendSummary
+    let usesPerModelPricing: Bool
 
     private let columns = [
         GridItem(.flexible(minimum: 132), spacing: 14),
@@ -201,7 +202,7 @@ struct AgentUsageSpendPanel: View {
                 .frame(height: 104)
                 .padding(.top, 2)
 
-            AgentUsageSpendFooter(summary: summary)
+            AgentUsageSpendFooter(summary: summary, usesPerModelPricing: usesPerModelPricing)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
@@ -210,6 +211,7 @@ struct AgentUsageSpendPanel: View {
 
 struct AgentUsageSpendFooter: View {
     let summary: AgentUsageSpendSummary
+    let usesPerModelPricing: Bool
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
@@ -256,7 +258,10 @@ struct AgentUsageSpendFooter: View {
     }
 
     private var pricingLabel: some View {
-        Text(appLocalized: AgentUsageCostEstimator.blendedCodexClaudePricing.label)
+        // 有逐 model 資料時標示官方定價；純舊資料（全 blend）維持均價標示。
+        Text(appLocalized: usesPerModelPricing
+            ? "按模型官方定价"
+            : AgentUsageCostEstimator.blendedCodexClaudePricing.label)
             .font(.system(size: 11, weight: .medium))
             .foregroundColor(.white.opacity(0.42))
             .lineLimit(1)

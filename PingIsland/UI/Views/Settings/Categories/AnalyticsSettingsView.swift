@@ -61,6 +61,8 @@ struct AgentUsageAnalyticsContent: View {
 
             spendCard
 
+            perModelCard
+
             activityMapCard
 
             overviewCard
@@ -105,9 +107,25 @@ struct AgentUsageAnalyticsContent: View {
 
     private var spendCard: some View {
         SettingsSectionCard(title: "Token 费用预估") {
-            AgentUsageSpendPanel(summary: viewModel.snapshot.spendSummary)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 16)
+            AgentUsageSpendPanel(
+                summary: viewModel.snapshot.spendSummary,
+                // footer 呈現 30 天彙總，旗標用範圍無關的 perModelDailySpend（恆 30 天），
+                // 不用隨 selectedRange 變動的 perModelBreakdown，避免旗標與 footer 範圍錯位。
+                usesPerModelPricing: !viewModel.snapshot.perModelDailySpend.isEmpty
+            )
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
+        }
+    }
+
+    private var perModelCard: some View {
+        SettingsSectionCard(title: "各模型用量与花费") {
+            AgentUsagePerModelPanel(
+                breakdown: viewModel.snapshot.perModelBreakdown,
+                dailySpend: viewModel.snapshot.perModelDailySpend
+            )
+            .padding(.horizontal, 18)
+            .padding(.vertical, 16)
         }
     }
 
