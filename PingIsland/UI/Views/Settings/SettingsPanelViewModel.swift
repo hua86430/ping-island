@@ -195,12 +195,18 @@ final class SettingsPanelViewModel: ObservableObject {
     }
 
     func refreshAccessibilityStatus() {
+        // Only publish when the value actually changes. This runs on a 1 Hz poll while
+        // the settings window is open; @Published fires objectWillChange on every
+        // assignment even when the Bool is unchanged, which re-evaluated the whole
+        // NavigationSplitView body (and re-composited its vibrancy layers) once per
+        // second and showed up as periodic lag.
         guard AccessibilityPermissionStatus.isAvailable else {
-            accessibilityEnabled = false
+            if accessibilityEnabled { accessibilityEnabled = false }
             return
         }
 
-        accessibilityEnabled = accessibilityStatusProvider(false)
+        let next = accessibilityStatusProvider(false)
+        if accessibilityEnabled != next { accessibilityEnabled = next }
     }
 
     func refreshLocalizedState() {

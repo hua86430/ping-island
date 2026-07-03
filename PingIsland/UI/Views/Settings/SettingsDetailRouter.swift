@@ -44,9 +44,17 @@ struct SettingsDetailRouter: View {
         .id(currentCategory)
         .accessibilityIdentifier("settings.detail.\(currentCategory.rawValue)")
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        // Opaque dark base + within-window vibrancy. The previous full-panel
+        // `.behindWindow` blur sampled and re-blurred the entire desktop behind the
+        // (non-opaque) window every frame, so dragging any other window tanked
+        // system-wide FPS. The dark fill stops desktop show-through (and gives the
+        // vibrancy something in-window to sample) while keeping the frosted look.
         .background(
-            SettingsGlassSurface(material: .hudWindow, blendingMode: .behindWindow)
-                .ignoresSafeArea()
+            ZStack {
+                Color(white: 0.11)
+                SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
+            }
+            .ignoresSafeArea()
         )
     }
 }

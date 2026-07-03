@@ -731,6 +731,12 @@ struct NotchDisplayModeCard: View {
                         width: min(max(proxy.size.width * 0.9, 112), 168),
                         height: min(max(proxy.size.height * 0.28, 22), 28)
                     )
+                        // Keep this mode-card preview static. The other previews
+                        // hover-gate their mascot; this one was missing the gate, so its
+                        // idle Canvas + FloatingZOverlay TimelineViews ran at ~12 fps the
+                        // whole time the settings window was open, continuously
+                        // re-compositing the vibrancy-heavy window.
+                        .environment(\.mascotAnimationsEnabled, false)
                         .padding(.top, 10)
 
                     Spacer(minLength: 0)
