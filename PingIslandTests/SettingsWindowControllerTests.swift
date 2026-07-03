@@ -83,7 +83,9 @@ final class SettingsWindowControllerTests: XCTestCase {
 
         XCTAssertTrue(window.isVisible)
         XCTAssertFalse(window.isMiniaturized)
-        XCTAssertTrue(window.isMovableByWindowBackground)
+        // Drag from the native titlebar only (like macOS System Settings); move-by-
+        // background is off so a drag starting on a Slider is not stolen as a window move.
+        XCTAssertFalse(window.isMovableByWindowBackground)
         // Native titled + fullSizeContentView: the content view fills the frame,
         // so assert on the frame size (width is unaffected; height includes the
         // transparent titlebar) instead of contentRect, which subtracts it.

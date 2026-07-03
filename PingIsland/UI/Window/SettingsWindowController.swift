@@ -105,7 +105,11 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.title = ""
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
-        window.isMovableByWindowBackground = true
+        // Drag from the native (transparent) titlebar only, matching macOS System
+        // Settings. Move-by-background on a fullSizeContentView window makes the
+        // SwiftUI body report itself draggable, so a press-drag starting on a Slider
+        // is consumed as a window move before the slider's gesture runs.
+        window.isMovableByWindowBackground = false
         window.isOpaque = false
         window.backgroundColor = .clear
         window.minSize = minimumContentSize

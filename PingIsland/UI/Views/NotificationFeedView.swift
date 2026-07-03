@@ -115,6 +115,16 @@ private struct NotificationFeedRow: View {
         SessionPhaseHelpers.timeBadgeLabel(for: session.lastNotifiableActivityAt ?? session.lastActivity)
     }
 
+    // Scale feed text with the content-font-size setting, mirroring SessionListView
+    // so the feed matches the session list / hover preview the slider already drives.
+    private var titleFontSize: CGFloat {
+        CGFloat(settings.contentFontSize)
+    }
+
+    private var previewFontSize: CGFloat {
+        max(11, titleFontSize - 2)
+    }
+
     var body: some View {
         Button(action: onTap) {
             HStack(alignment: .center, spacing: 10) {
@@ -123,7 +133,7 @@ private struct NotificationFeedRow: View {
                 VStack(alignment: .leading, spacing: 3) {
                     HStack(spacing: 4) {
                         Text(session.displayTitle)
-                            .font(.system(size: 13, weight: .bold))
+                            .font(.system(size: titleFontSize, weight: .bold))
                             .foregroundColor(.white)
                             .lineLimit(1)
                         Spacer(minLength: 8)
@@ -134,7 +144,7 @@ private struct NotificationFeedRow: View {
 
                     if let previewLine {
                         Text(previewLine)
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.system(size: previewFontSize, weight: .medium))
                             .foregroundColor(.white.opacity(0.62))
                             .lineLimit(1)
                     }
