@@ -618,6 +618,12 @@
 "%@ Tokens" = "%@ tokens";
 "%@ · %@ Tokens · %@" = "%@ · %@ tokens · %@";
 "Codex / Claude Code 均价" = "Codex / Claude Code blended rate";
+"各模型用量与花费" = "Per-Model Usage & Cost";
+"按模型官方定价" = "Official per-model pricing";
+"其他" = "Other";
+"未知模型" = "Unknown model";
+"每日花费" = "Daily cost";
+"还没有可展示的模型数据" = "No per-model data yet";
 "活跃地图" = "Activity map";
 "概览" = "Overview";
 "Agent 类型" = "Agent types";
