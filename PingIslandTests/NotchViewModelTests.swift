@@ -70,7 +70,6 @@ final class NotchViewModelTests: XCTestCase {
                     isHovering: false,
                     status: .opened,
                     openReason: .hover,
-                    isSettingsPopoverPresented: false,
                     isInlineTextInputActive: true,
                     autoCollapseOnLeave: true
                 )
@@ -81,7 +80,6 @@ final class NotchViewModelTests: XCTestCase {
                     isHovering: false,
                     status: .opened,
                     openReason: .hover,
-                    isSettingsPopoverPresented: false,
                     isInlineTextInputActive: false,
                     autoCollapseOnLeave: true
                 )
