@@ -6,6 +6,7 @@ struct ClaudeTranscriptUsageSnapshot: Equatable, Sendable {
     let fileSize: UInt64
     let contentHash: String
     let tokenTotals: AgentUsageTokenTotals
+    let tokenTotalsByModel: [String: AgentUsageTokenTotals]
 }
 
 enum ClaudeTranscriptUsageLoader {
@@ -33,6 +34,7 @@ enum ClaudeTranscriptUsageLoader {
         let data = try Data(contentsOf: fileURL)
         let content = String(decoding: data, as: UTF8.self)
         var totals = AgentUsageTokenTotals()
+        var totalsByModel: [String: AgentUsageTokenTotals] = [:]
         var latestUsageDate: Date?
 
         for rawLine in content.split(separator: "\n", omittingEmptySubsequences: false) {
@@ -44,6 +46,8 @@ enum ClaudeTranscriptUsageLoader {
             }
 
             totals.add(lineTotals)
+            let modelKey = AgentUsageModelPricing.normalizedKey(forModel: modelIdentifier(from: object))
+            totalsByModel[modelKey, default: AgentUsageTokenTotals()].add(lineTotals)
             if let lineDate = timestamp(from: object["timestamp"]),
                latestUsageDate == nil || lineDate > latestUsageDate! {
                 latestUsageDate = lineDate
@@ -59,8 +63,20 @@ enum ClaudeTranscriptUsageLoader {
             capturedAt: latestUsageDate ?? resourceValues.contentModificationDate,
             fileSize: UInt64(data.count),
             contentHash: fnv1aHashHex(for: data),
-            tokenTotals: totals
+            tokenTotals: totals,
+            tokenTotalsByModel: totalsByModel
         )
+    }
+
+    private nonisolated static func modelIdentifier(from object: [String: Any]) -> String? {
+        if let message = object["message"] as? [String: Any],
+           let model = message["model"] as? String, !model.isEmpty {
+            return model
+        }
+        if let model = object["model"] as? String, !model.isEmpty {
+            return model
+        }
+        return nil
     }
 
     private nonisolated static func usageTotals(from object: [String: Any]) -> AgentUsageTokenTotals? {

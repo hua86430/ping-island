@@ -181,6 +181,74 @@ final class ClaudeTranscriptUsageLoaderTests: XCTestCase {
         XCTAssertEqual(snapshot.tokenTotals, AgentUsageTokenTotals(input: 12, output: 8))
         XCTAssertEqual(snapshot.sessionCount, 1)
     }
+
+    func testLoadBucketsMixedModelTranscriptPerModel() throws {
+        let transcriptURL = temporaryTranscriptURL(named: "mixed-model")
+        defer { try? FileManager.default.removeItem(at: transcriptURL.deletingLastPathComponent()) }
+
+        try writeJSONLLines([
+            [
+                "timestamp": "2026-04-10T00:00:00.000Z",
+                "type": "assistant",
+                "message": [
+                    "role": "assistant",
+                    "model": "claude-opus-4-8",
+                    "usage": [
+                        "input_tokens": 100,
+                        "cache_creation_input_tokens": 20,
+                        "cache_read_input_tokens": 30,
+                        "output_tokens": 50,
+                    ],
+                ],
+            ],
+            [
+                "timestamp": "2026-04-10T00:01:00.000Z",
+                "type": "assistant",
+                "message": [
+                    "role": "assistant",
+                    "model": "claude-haiku-4-5-20251001",
+                    "usage": [
+                        "input_tokens": 10,
+                        "output_tokens": 4,
+                    ],
+                ],
+            ],
+        ], to: transcriptURL)
+
+        let snapshot = try XCTUnwrap(ClaudeTranscriptUsageLoader.load(from: transcriptURL))
+
+        XCTAssertEqual(
+            snapshot.tokenTotalsByModel["opus-4.8"],
+            AgentUsageTokenTotals(input: 100, cacheCreation: 20, cacheRead: 30, output: 50)
+        )
+        XCTAssertEqual(
+            snapshot.tokenTotalsByModel["haiku-4.5"],
+            AgentUsageTokenTotals(input: 10, output: 4)
+        )
+        XCTAssertEqual(snapshot.tokenTotalsByModel.count, 2)
+        var summed = AgentUsageTokenTotals()
+        for totals in snapshot.tokenTotalsByModel.values { summed.add(totals) }
+        XCTAssertEqual(snapshot.tokenTotals, summed, "aggregate must equal the per-model sum")
+    }
+
+    func testLoadBucketsModellessLinesUnderUnknown() throws {
+        let transcriptURL = temporaryTranscriptURL(named: "modelless")
+        defer { try? FileManager.default.removeItem(at: transcriptURL.deletingLastPathComponent()) }
+
+        try writeJSONLLines([
+            [
+                "timestamp": "2026-04-10T00:02:00.000Z",
+                "usage": [
+                    "prompt_tokens": 13,
+                    "completion_tokens": 8,
+                ],
+            ],
+        ], to: transcriptURL)
+
+        let snapshot = try XCTUnwrap(ClaudeTranscriptUsageLoader.load(from: transcriptURL))
+
+        XCTAssertEqual(snapshot.tokenTotalsByModel["unknown"], AgentUsageTokenTotals(input: 13, output: 8))
+    }
 }
 
 private func temporaryTranscriptURL(named name: String) -> URL {
