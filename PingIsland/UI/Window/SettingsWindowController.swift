@@ -92,19 +92,19 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         )
         let window = SettingsPanelWindow(
             contentRect: NSRect(origin: .zero, size: defaultContentSize),
-            styleMask: [.borderless, .resizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
             backing: .buffered,
             defer: false
         )
 
         window.contentViewController = hostingController
+        hostingController.safeAreaRegions = []
         window.title = ""
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.isMovableByWindowBackground = true
         window.isOpaque = false
         window.backgroundColor = .clear
-        window.hasShadow = false
         window.minSize = minimumContentSize
         window.maxSize = maximumContentSize
         window.setContentSize(defaultContentSize)

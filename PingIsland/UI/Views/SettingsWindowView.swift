@@ -2187,13 +2187,6 @@ private struct SettingsCategoryLoadingView: View {
     }
 }
 
-private struct SettingsSidebarSection: Identifiable {
-    let title: String?
-    let categories: [SettingsCategory]
-
-    var id: String { title ?? categories.map(\.rawValue).joined(separator: "-") }
-}
-
 private struct SettingsGlassSurface: NSViewRepresentable {
     let material: NSVisualEffectView.Material
     var blendingMode: NSVisualEffectView.BlendingMode = .behindWindow
@@ -2214,29 +2207,11 @@ private struct SettingsGlassSurface: NSViewRepresentable {
     }
 }
 
-private struct SettingsWindowDragHandle: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView {
-        DragHandleView()
-    }
-
-    func updateNSView(_ nsView: NSView, context: Context) {}
-
-    private final class DragHandleView: NSView {
-        override var mouseDownCanMoveWindow: Bool { false }
-
-        override func mouseDown(with event: NSEvent) {
-            window?.performDrag(with: event)
-        }
-    }
-}
-
 private enum SettingsPanelMetrics {
     static let windowSize = AppSettings.defaultSettingsWindowSize
     static let windowMinSize = AppSettings.minimumSettingsWindowSize
     static let windowMaxSize = AppSettings.maximumSettingsWindowSize
     static let windowSidebarWidth: CGFloat = 236
-    static let windowContentTopInset: CGFloat = 0
-    static let outerPadding: CGFloat = 0
 }
 
 private struct SettingsPanelContentView: View {
@@ -2262,31 +2237,27 @@ private struct SettingsPanelContentView: View {
     @State private var categoryRefreshTask: Task<Void, Never>?
 
     var body: some View {
-        ZStack {
-            HStack(spacing: 0) {
-                sidebar
-                    .frame(width: sidebarWidth)
-                    .frame(maxHeight: .infinity, alignment: .top)
-
-                detail
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
-            .padding(.top, contentTopInset)
-            .padding(.horizontal, SettingsPanelMetrics.outerPadding)
-            .padding(.bottom, SettingsPanelMetrics.outerPadding)
-            .frame(
-                minWidth: minimumWidth,
-                idealWidth: idealWidth,
-                maxWidth: maximumWidth,
-                minHeight: minimumHeight,
-                idealHeight: idealHeight,
-                maxHeight: maximumHeight,
-                alignment: .topLeading
-            )
+        NavigationSplitView {
+            sidebar
+                .navigationSplitViewColumnWidth(
+                    min: SettingsPanelMetrics.windowSidebarWidth,
+                    ideal: SettingsPanelMetrics.windowSidebarWidth,
+                    max: SettingsPanelMetrics.windowSidebarWidth + 60
+                )
+        } detail: {
+            detail
         }
-        .background(panelBackgroundColor)
-        .ignoresSafeArea()
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .navigationSplitViewStyle(.balanced)
+        .toolbar(removing: .sidebarToggle)
+        .ignoresSafeArea(.container, edges: .top)
+        .frame(
+            minWidth: SettingsPanelMetrics.windowMinSize.width,
+            idealWidth: SettingsPanelMetrics.windowSize.width,
+            maxWidth: SettingsPanelMetrics.windowMaxSize.width,
+            minHeight: SettingsPanelMetrics.windowMinSize.height,
+            idealHeight: SettingsPanelMetrics.windowSize.height,
+            maxHeight: SettingsPanelMetrics.windowMaxSize.height
+        )
         .preferredColorScheme(.dark)
         .environment(\.mascotAnimationsEnabled, arePreviewAnimationsActive)
         .onAppear {
@@ -2428,149 +2399,26 @@ private struct SettingsPanelContentView: View {
         }
     }
 
-    private var minimumWidth: CGFloat { SettingsPanelMetrics.windowMinSize.width }
-    private var maximumWidth: CGFloat { SettingsPanelMetrics.windowMaxSize.width }
-    private var idealWidth: CGFloat { SettingsPanelMetrics.windowSize.width }
-    private var minimumHeight: CGFloat { SettingsPanelMetrics.windowMinSize.height }
-    private var maximumHeight: CGFloat { SettingsPanelMetrics.windowMaxSize.height }
-    private var idealHeight: CGFloat { SettingsPanelMetrics.windowSize.height }
-    private var sidebarWidth: CGFloat { SettingsPanelMetrics.windowSidebarWidth }
-
-    private var panelBackgroundColor: Color {
-        .clear
-    }
-
-    private var contentTopInset: CGFloat { SettingsPanelMetrics.windowContentTopInset }
-
-    private var sidebarSections: [SettingsSidebarSection] {
-        [
-            SettingsSidebarSection(
-                title: nil,
-                categories: SettingsCategory.visibleCategories(labsUnlocked: settings.labsSettingsUnlocked)
-            )
-        ]
-    }
-
     private var sidebar: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 18) {
-                sidebarWindowControls
-
-                ForEach(sidebarSections) { section in
-                    VStack(alignment: .leading, spacing: 8) {
-                        if let title = section.title {
-                            Text(appLocalized: title)
-                                .font(.system(size: 11, weight: .bold))
-                                .foregroundColor(.white.opacity(0.32))
-                                .padding(.horizontal, 12)
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(section.categories) { category in
-                                Button {
-                                    selectSidebarCategory(category)
-                                } label: {
-                                    SidebarItemView(
-                                        category: category,
-                                        isSelected: selectedCategory == category,
-                                        showsNoticeDot: category == .integration && viewModel.hasIntegrationNotice
-                                    )
-                                }
-                                .buttonStyle(.plain)
-                                .accessibilityIdentifier("settings.sidebar.\(category.rawValue)")
-                            }
-                        }
+        List(selection: $selectedCategory) {
+            ForEach(SettingsCategory.visibleCategories(labsUnlocked: settings.labsSettingsUnlocked)) { category in
+                SidebarItemView(
+                    category: category,
+                    isSelected: selectedCategory == category,
+                    showsNoticeDot: category == .integration && viewModel.hasIntegrationNotice
+                )
+                .tag(category)
+                .listRowBackground(Color.clear)
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        selectSidebarCategory(category)
                     }
-                }
-                Spacer(minLength: 0)
+                )
+                .accessibilityIdentifier("settings.sidebar.\(category.rawValue)")
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 14)
         }
-        .padding(8)
-        .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-                .fill(Color.white.opacity(0.055))
-                .overlay {
-                    SettingsGlassSurface(material: .sidebar, blendingMode: .withinWindow)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 24,
-                                bottomLeadingRadius: 24,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 0,
-                                style: .continuous
-                            )
-                        )
-                        .opacity(0.94)
-                }
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.12),
-                            Color.white.opacity(0.04),
-                            Color.black.opacity(0.10)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 24,
-                            bottomLeadingRadius: 24,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 0,
-                            style: .continuous
-                        )
-                    )
-                }
-                .overlay(alignment: .topTrailing) {
-                    Circle()
-                        .fill(Color.white.opacity(0.16))
-                        .frame(width: 120, height: 120)
-                        .blur(radius: 36)
-                        .offset(x: 28, y: -26)
-                }
-        )
-        .overlay(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 24,
-                bottomLeadingRadius: 24,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 0,
-                style: .continuous
-            )
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.20), radius: 24, y: 14)
-    }
-
-    private var sidebarWindowControls: some View {
-        HStack(spacing: 10) {
-            WindowControlButton(color: Color(red: 1.0, green: 0.37, blue: 0.36)) {
-                if let onClose {
-                    onClose()
-                } else {
-                    currentWindow?.performClose(nil)
-                }
-            }
-
-            WindowControlButton(color: Color(red: 1.0, green: 0.74, blue: 0.18)) {
-                currentWindow?.miniaturize(nil)
-            }
-
-            SettingsWindowDragHandle()
-                .frame(maxWidth: .infinity, minHeight: 22, maxHeight: 22)
-                .accessibilityHidden(true)
-        }
-        .padding(.horizontal, 8)
-        .padding(.bottom, 2)
+        .listStyle(.sidebar)
+        .padding(.top, 28)
     }
 
     @ViewBuilder
@@ -2605,66 +2453,17 @@ private struct SettingsPanelContentView: View {
                 }
             }
             .padding(.horizontal, 22)
-            .padding(.top, 24)
+            .padding(.top, 0)
             .padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .id(currentCategory)
         .accessibilityIdentifier("settings.detail.\(currentCategory.rawValue)")
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 26,
-                topTrailingRadius: 26,
-                style: .continuous
-            )
-                .fill(Color.white.opacity(0.035))
-                .overlay {
-                    SettingsGlassSurface(material: .hudWindow, blendingMode: .withinWindow)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 0,
-                                bottomLeadingRadius: 0,
-                                bottomTrailingRadius: 26,
-                                topTrailingRadius: 26,
-                                style: .continuous
-                            )
-                        )
-                        .opacity(0.96)
-                }
-                .overlay {
-                    LinearGradient(
-                        colors: [
-                            Color.white.opacity(0.11),
-                            Color.white.opacity(0.03),
-                            Color.black.opacity(0.05)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 0,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 26,
-                            topTrailingRadius: 26,
-                            style: .continuous
-                        )
-                    )
-                }
+            SettingsGlassSurface(material: .hudWindow, blendingMode: .behindWindow)
+                .ignoresSafeArea()
         )
-        .overlay(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 26,
-                topTrailingRadius: 26,
-                style: .continuous
-            )
-                .strokeBorder(Color.white.opacity(0.10), lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(0.16), radius: 24, y: 14)
     }
 
     private var currentCategory: SettingsCategory {
@@ -2690,7 +2489,13 @@ private struct SettingsPanelContentView: View {
 
         if !settings.labsSettingsUnlocked, consecutiveGeneralTapCount >= 6 {
             settings.labsSettingsUnlocked = true
-            selectedCategory = .labs
+            // List's selection binding may write back .general after this handler;
+            // defer the jump to .labs one runloop turn so it sticks.
+            DispatchQueue.main.async {
+                selectedCategory = .labs
+                scheduleCategoryRefresh(for: .labs, showLoading: shouldShowLoading(for: .labs))
+            }
+            return
         }
 
         let categoryToRefresh = currentCategory
@@ -3836,24 +3641,6 @@ private struct SidebarItemView: View {
         )
         .shadow(color: isSelected ? category.tint.opacity(0.18) : .clear, radius: 14, y: 8)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-    }
-}
-
-private struct WindowControlButton: View {
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Circle()
-                .fill(color)
-                .frame(width: 12, height: 12)
-                .overlay(
-                    Circle()
-                        .strokeBorder(Color.black.opacity(0.18), lineWidth: 0.5)
-                )
-        }
-        .buttonStyle(.plain)
     }
 }
 
