@@ -34,8 +34,10 @@ struct NotificationFeedView: View {
                         .foregroundColor(.white.opacity(0.7))
                     Spacer()
                     if !feed.isEmpty {
-                        Button(AppLocalization.string("清除全部")) {
+                        Button {
                             sessionMonitor.markAllSessionsSeen()
+                        } label: {
+                            Text(appLocalized: "清除全部")
                         }
                         .buttonStyle(.plain)
                         .font(.system(size: 11, weight: .medium))
