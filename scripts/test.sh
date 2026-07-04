@@ -19,6 +19,9 @@ cd "$PROJECT_DIR"
 run_step "Simplified Chinese Guard" \
     swift scripts/check-simplified-chinese.swift
 
+run_step "Architecture Coverage" \
+    bash scripts/check-arch-coverage.sh
+
 run_step "Prototype Tests" \
     swift test --package-path Prototype
 

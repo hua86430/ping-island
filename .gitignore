@@ -46,5 +46,4 @@ releases/notes/*
 
 # Xcode backup
 *.xcodeproj.backup/
-CLAUDE.md
 .omx/
