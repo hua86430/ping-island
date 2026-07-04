@@ -4,7 +4,6 @@
 </h1>
 <p align="center">
   <b>AI coding session monitor for the macOS menu bar</b><br>
-  <a href="https://erha19.github.io/">Website</a> •
   <a href="#lets-try-it">Try it</a> •
   <a href="#installation">Install</a> •
   <a href="#features">Features</a> •
@@ -12,15 +11,15 @@
   <a href="#build-from-source">Build</a> •
   <a href="#contributors">Contributors</a> •
   <a href="docs/privacy-policy.md">Privacy</a><br>
-  English | <a href="README.zh-CN.md">简体中文</a>
+  English | <a href="README.zh-Hant.md">繁體中文</a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/erha19/ping-island/releases">
-    <img src="https://img.shields.io/github/v/release/erha19/ping-island?display_name=tag&style=flat-square" alt="Latest release">
+  <a href="https://github.com/hua86430/ping-island/releases">
+    <img src="https://img.shields.io/github/v/release/hua86430/ping-island?display_name=tag&style=flat-square" alt="Latest release">
   </a>
-  <a href="https://github.com/erha19/ping-island/releases">
-    <img src="https://img.shields.io/github/downloads/erha19/ping-island/total?style=flat-square" alt="Release downloads">
+  <a href="https://github.com/hua86430/ping-island/releases">
+    <img src="https://img.shields.io/github/downloads/hua86430/ping-island/total?style=flat-square" alt="Release downloads">
   </a>
   <img src="https://img.shields.io/badge/macOS-14%2B-0A84FF?style=flat-square&logo=apple&logoColor=white" alt="macOS 14 or later">
   <img src="https://img.shields.io/badge/Swift-6.1-FA7343?style=flat-square&logo=swift&logoColor=white" alt="Swift 6.1">
@@ -35,10 +34,6 @@
 
 <p align="center">
   <sub>Watch active coding sessions, answer follow-up questions, and jump back to the right terminal or IDE window.</sub>
-</p>
-
-<p align="center">
-  <sub>Official website: <a href="https://erha19.github.io/ping-island/">erha19.github.io/ping-island</a></sub>
 </p>
 
 <p align="center">
@@ -86,7 +81,7 @@ brew install --cask ping-island
 
 ### Download a Release
 
-1. Visit the [official website](https://erha19.github.io/ping-island/) for the product overview and latest download link, or go straight to [Releases](https://github.com/erha19/ping-island/releases).
+1. Go to [Releases](https://github.com/hua86430/ping-island/releases).
 2. Download the latest DMG.
 3. Move `Ping Island.app` into your Applications folder.
 4. Launch the app and start the clients you want Ping Island to monitor.
@@ -99,7 +94,7 @@ brew install --cask ping-island
 Requires macOS 14+ and an Xcode toolchain that can build the Xcode project and the Swift 6.1 `Prototype` package tests.
 
 ```bash
-git clone https://github.com/erha19/ping-island.git
+git clone https://github.com/hua86430/ping-island.git
 cd ping-island
 
 # Debug build
@@ -145,7 +140,10 @@ Ping Island focuses on the moments that actually interrupt coding flow, then kee
 - **Codex hook + app-server sync** - Support Codex CLI hooks, live app-server threads, and rollout parsing fallback when needed.
 - **Custom sounds** - Pick per-event macOS sounds or import local sound packs for your own notification style.
 - **Custom agent mascots** - Give each client its own animated mascot override across the notch, session list, and hover UI.
-- **Buddy detach in v0.5.0+** - Drag the active Buddy out of the notch so it can stay nearby as an independent floating companion.
+- **Detachable floating pet** - Drag the active pet out of the notch; hover or click it to expand session previews as message bubbles while it stays anchored nearby.
+- **Usage & cost analytics** - Track Claude 5h / 7d OAuth usage windows, Codex rollout quota, and a per-model usage & cost breakdown in Settings -> Analytics.
+- **Notification feed mode** - Opt-in notification-center list: only sessions with unread activity appear, tap one to jump and clear it, with an unread count on the collapsed island.
+- **English & Traditional Chinese UI** - Fully localized in English and Traditional Chinese (zh-Hant), with a CI guard that keeps Simplified Chinese out of the zh-Hant strings.
 - **Hermes courier-fox mascot** - Hermes Agent uses a gold courier fox with a winged helmet and satchel so plugin-hook sessions stay visually distinct from the Claude/Qwen family.
 - **Pi terminal-cloud mascot** - Pi Agent uses its own terminal-cloud mascot so extension-hook sessions are easy to spot in the Island UI.
 - **Qwen capybara mascot** - Qwen Code now ships with a mint-scarf capybara mascot tuned for prompt, reply, and notification-heavy flows.
@@ -198,12 +196,18 @@ If `PingIslandUITests-Runner` stays suspended on macOS, run the UI tests from Xc
 
 ## Settings
 
-Ping Island currently ships a 4-category settings panel:
+Ping Island ships a multi-category settings panel:
 
 - **General** - launch at login and baseline app behavior
-- **Display** - notch display target and placement behavior
+- **Display** - surface mode (docked notch or detached pet), notch display target, placement, and closed-notch usage readout
 - **Mascot** - client mascot previews, per-client overrides, animation states
 - **Sound** - event-specific sounds, sound pack mode, sound pack import
+- **Shortcuts** - customizable global shortcuts for opening the Island and common actions
+- **Integration** - per-client hook install state, IDE focus extension install, and Accessibility permission
+- **Analytics** - Claude / Codex usage plus a per-model usage & cost breakdown
+- **Remote** - SSH remote host management and bridge status
+- **Labs** - experimental feature flags
+- **About** - version info, update checks, release notes, and diagnostics export
 
 ## Custom Sounds
 
@@ -313,9 +317,11 @@ Implementation details worth knowing:
 
 Thanks to everyone who has helped shape Ping Island through code, issues, ideas, testing, docs, design feedback, and release validation.
 
-See the full contributor history on the [GitHub contributors graph](https://github.com/erha19/ping-island/graphs/contributors).
+See the full contributor history on the [GitHub contributors graph](https://github.com/hua86430/ping-island/graphs/contributors).
 
 ## Acknowledgments
+
+This repository is a fork of [erha19/ping-island](https://github.com/erha19/ping-island); thanks to the upstream project and its contributors.
 
 Ping Island follows the lineage of notch-first agent monitors such as [claude-island](https://github.com/farouqaldori/claude-island), and adapts that idea into a broader multi-client session surface with hooks, app-server sync, and IDE routing.
 
