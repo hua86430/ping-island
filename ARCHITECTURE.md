@@ -12,7 +12,8 @@
 
 - **覆蓋率 metric = 檔案級 100%**。每個 production source `.swift` 檔都必須被某一章記載其責任與關鍵型別，並出現在「附錄 B 檔案覆蓋矩陣」。分母是 177 個檔（`PingIsland/` 157 + `Prototype/Sources/` 20）。`Prototype/Tests/` 的 12 個測試檔不計入（測試不是架構，其涵蓋範圍在 §15 概述）。
 - **粒度刻意停在檔案／型別／流程級，不逐 if/else**。行級細節看 code；文件記的是「改介面或改流程才需要動」的結構。流程用 mermaid，規則與資料契約用散文加表格。這是為了讓文件維護得動——逐行複製 code 的文件一次 commit 就死。
-- **改任何 code 或架構，同一個 PR 一併更新**：改到的檔 → 更新對應章的敘述與圖；新增檔 → 加進附錄 B 矩陣並歸入某章；刪檔 → 移除矩陣列與相關敘述；改跨子系統流程 → 更新「跨切面流程索引」與相關章的圖。
+- **只要 code 或架構有改，`ARCHITECTURE.md` 就一起改** — code change 沒改到 doc 就不算完成。這是以「每次改 code」為單位，不綁 PR 或 commit 邊界：改到的檔 → 更新對應章的敘述與圖；新增檔 → 加進附錄 B 矩陣並歸入某章；刪檔 → 移除矩陣列與相關敘述；改跨子系統流程 → 更新「跨切面流程索引」與相關章的圖。
+- **docs-first 開發要把 doc 更新寫進 plan**：本專案常用 superpowers（`brainstorming` → `writing-plans`，spec/plan 放 `docs/superpowers/`）先寫文件再開發。當 spec/plan 描述某個 code change 時，那份 plan 必須把「更新 `ARCHITECTURE.md` 與覆蓋矩陣」列成明確 task／步驟 — doc 更新是工作項的一部分，跟著實作一起出，不落後。
 - **commit 前跑 `scripts/check-arch-coverage.sh`**。它列出所有 doc 未提及的 source 檔，非空則 exit 1，可當 CI gate。這條規則釘在 `CLAUDE.md` 與 `AGENTS.md`，不是靠記性。
 
 驗證指令：
