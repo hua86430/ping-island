@@ -4,8 +4,8 @@
 
 ## 待處理
 
-- [ ] 全 app 簡體中文清零（繁化總掃）— spec + plan 就緒，未實作
-  - desc: 0.24.4 只做了部分繁化，設定 GUI（含下拉選單）、執行期狀態文字仍漏簡體。稽核（ICU Hans-Hant 逐字掃 `PingIsland/`）結果：zh-Hant.lproj 值殘留簡體 2 筆（占→佔，行 54/168）+ en 有 zh-Hant 缺 1 key；app Swift 命中 729 列，其中 350 列是已有值的 key（多數安全）、47 列（41 個 key）指向 zh-Hant 缺值 key → 螢幕 fallback 簡體、146 列硬編簡體字面量。三種漏法：缺值 key fallback、`Text(verbatim:)`/插值硬編、enum `title`/`subtitle` 下拉選單標籤。修法分流：zh-Hant 值就地改繁；缺值 key 補 zh-Hant(+en) 值（不動 Swift）；硬編字面量就地繁化。務必保留：簡體 KEY（識別碼，`SettingsWindowControllerTests` 有斷言）、比對「傳入 agent 簡體輸出」的 matcher（`SessionState` 進度陣列、`SessionStore` Qoder 提問偵測共 26 列 — 白名單）。反向特例：`UpdateReleaseNotes` iconSymbolName 比對的是繁體 release notes，要改繁才對得上。逐字校正陷阱（ICU 會錯）：複製 / 回覆 / 答覆 / 標準 / 準備 / …裡 / 關係。含一支 guard scanner（`scripts/check-simplified-chinese.swift`）+ Xcode guard test 防回歸。spec `docs/superpowers/specs/2026-07-04-full-app-traditional-chinese-sweep-design.md`；plan `docs/superpowers/plans/2026-07-04-full-app-traditional-chinese-sweep.md`。
+- [x] 全 app 簡體中文清零（繁化總掃）— 完成，scanner 綠、build 綠、guard test 綠
+  - desc: guard scanner `scripts/check-simplified-chinese.swift`（ICU Hans-Hant 逐字，key-aware：Simplified Swift literal 若是已解析 zh-Hant key 則放行；matcher 用 `// i18n:simplified-matcher-*` 區塊標記排除，非行號白名單）。實作分三路：(1) zh-Hant.lproj 2 筆殘留值就地改繁（占→佔 行 54/168）+ 補 en-only 缺的 1 key；(2) 40 個 lookup key（`Text(appLocalized:)`/`AppLocalization.format`）補 en + zh-Hant 值、保留簡體 key；(3) 113 個硬編/enum/插值 literal 就地繁化（quote-delimited 全字串比對，避免短詞誤傷長 literal）。matcher 保留簡體並加區塊標記：`SessionState` 4 個進度陣列 + `SessionStore` 2 個 Qoder 提問偵測函式；`SessionStore` 提問卡 DISPLAY 字串照樣繁化。回歸：`PingIslandTests/SimplifiedChineseGuardTests.swift`（zh-Hant 值 ICU 檢查 + scanner 檔存在）；scanner 併入 `scripts/test.sh` 第一步。`SettingsWindowControllerTests`（斷言簡體 key 存在）續綠。spec `docs/superpowers/specs/2026-07-04-full-app-traditional-chinese-sweep-design.md`；plan `docs/superpowers/plans/2026-07-04-full-app-traditional-chinese-sweep.md`。commit 待使用者確認 Jira ticket。
 
 - [x] 通知 feed 自動彈開切開（auto-open decoupling）— 已發 0.25.0（含懸停延遲/動畫時長滑桿、助理回覆才算未讀）
   - desc: feed mode 下:開新 session/打字永不彈;提問/審批照彈且留;回覆完成 → 彈 feed banner 5 秒自收（hover 暫停、移開即收、自癒 re-arm）;session mode 逐位元組不變（決策 log 證明）。live 實測抓到並修掉 willSet-stale arming + stuck-open;既有完成卡 presenter 在本機從不 present = 既有謎、另開診斷（feed banner 已補位）。spec `docs/superpowers/specs/2026-07-02-feed-mode-auto-open-design.md`;證據 `.superpowers/sdd/feed-autoopen-selftest-report.md`。
@@ -35,8 +35,7 @@
 - [ ] 簽章發版（release-packages.yml）補 Xcode 26 select — 未做
   - desc: 目前只有 `release-unsigned.yml` 加了「Select Xcode 26」步驟。`release-packages.yml`（Developer ID + notarize、workflow_dispatch-only、tag 不觸發）仍是 macos-15 預設 Xcode 16，走簽章發版出的包在 macOS 26 上不會有 Liquid Glass。要比照補同樣 select 步驟。
 
-- [ ] macOS 26 SDK 全 app 外觀掃查 — 未做
-  - desc: 0.25.3 起用 macOS 26 SDK 編，自動 Liquid Glass 是全 app 生效、不只設定視窗。notch UI、detached 浮動島、welcome／hook 視窗等自刻 AppKit 視窗在 macOS 26 下的外觀只驗過設定視窗，其餘待逐一目視確認沒被玻璃化弄歪。
+- [x] macOS 26 SDK 全 app 外觀掃查 — 使用者確認 OK
 
 - [ ] Ctrl-C 退出的 session 殘留通知欄 — spec 就緒，未實作
   - desc: local Claude hook session `pid` 恆為 nil → 存活檢查跳過 → Ctrl-C 後卡 `.idle` 永不 `.ended`。修法：liveness sweep 用 `ProcessTreeBuilder` 查該 tty 上是否還有 `claude`。spec `docs/superpowers/specs/2026-07-01-ctrlc-session-liveness-design.md`。

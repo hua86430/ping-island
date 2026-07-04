@@ -301,7 +301,7 @@ struct ManagedHookClientProfile: Identifiable, Sendable {
         case .hookDirectory:
             return "这会重新生成 %@ 的 Island hook 目录，并刷新 OpenClaw 的启用状态。"
         case .tomlHooks:
-            return "这会重新写入 %@ 的 Island hooks TOML 配置，并保留其他非 Island 设置。"
+            return "這會重新寫入 %@ 的 Island hooks TOML 設定，並保留其他非 Island 設定。"
         }
     }
 
@@ -652,7 +652,7 @@ enum ClientProfileRegistry {
         ManagedHookClientProfile(
             id: "pi-hooks",
             title: "Pi Agent",
-            subtitle: "管理 ~/.pi/agent/extensions/ping_island，按 Pi 官方 extension 机制接入 Island",
+            subtitle: "管理 ~/.pi/agent/extensions/ping_island，依 Pi 官方 extension 機制接入 Island",
             installationKind: .pluginDirectory,
             alwaysVisibleInSettings: true,
             logoAssetName: "PiLogo",
@@ -830,7 +830,7 @@ enum ClientProfileRegistry {
         ManagedHookClientProfile(
             id: "cursor-hooks",
             title: "Cursor",
-            subtitle: "管理 ~/.cursor/hooks.json，按 Claude Hooks 协议接入 Island",
+            subtitle: "管理 ~/.cursor/hooks.json，依 Claude Hooks 協定接入 Island",
             logoAssetName: "CursorLogo",
             prefersBundledLogoOverAppIcon: true,
             localAppBundleIdentifiers: ["com.todesktop.230313mzl4w4u92"],
@@ -858,7 +858,7 @@ enum ClientProfileRegistry {
         ManagedHookClientProfile(
             id: "qoder-hooks",
             title: "Qoder",
-            subtitle: "管理 ~/.qoder/settings.json，支持 Qoder IDE 会话、提问与权限提醒事件",
+            subtitle: "管理 ~/.qoder/settings.json，支援 Qoder IDE 工作階段、提問與權限提醒事件",
             logoAssetName: "QoderLogo",
             prefersBundledLogoOverAppIcon: true,
             localAppBundleIdentifiers: ["com.qoder.ide"],
@@ -881,7 +881,7 @@ enum ClientProfileRegistry {
         ManagedHookClientProfile(
             id: "qoder-cli-hooks",
             title: "Qoder CLI",
-            subtitle: "管理 ~/.qoder/settings.json，按 Claude Code hooks 协议接入新版 Qoder CLI",
+            subtitle: "管理 ~/.qoder/settings.json，依 Claude Code hooks 協定接入新版 Qoder CLI",
             logoAssetName: "QoderLogo",
             prefersBundledLogoOverAppIcon: true,
             iconSymbolName: "bolt.horizontal.circle.fill",
@@ -986,7 +986,7 @@ enum ClientProfileRegistry {
         ManagedHookClientProfile(
             id: "kimi-hooks",
             title: "Kimi CLI",
-            subtitle: "管理 ~/.kimi/config.toml，按 Kimi CLI 官方 hooks 协议接入 Island",
+            subtitle: "管理 ~/.kimi/config.toml，依 Kimi CLI 官方 hooks 協定接入 Island",
             installationKind: .tomlHooks,
             alwaysVisibleInSettings: true,
             logoAssetName: "KimiLogo",

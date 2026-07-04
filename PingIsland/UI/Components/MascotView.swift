@@ -88,13 +88,13 @@ enum MascotClient: String, CaseIterable, Identifiable, Sendable {
         case .gemini:
             return "Gemini CLI hooks 与默认 Gemini CLI 会话"
         case .hermes:
-            return "Hermes plugin hooks 与翼盔信使狐"
+            return "Hermes plugin hooks 與翼盔信使狐"
         case .pi:
-            return "Pi extension hooks 与终端云团"
+            return "Pi extension hooks 與終端機雲團"
         case .qwen:
-            return "Qwen Code 官方 hooks 与薄荷围巾卡皮巴拉"
+            return "Qwen Code 官方 hooks 與薄荷圍巾卡皮巴拉"
         case .openclaw:
-            return "OpenClaw Gateway hooks 与默认小龙虾形象"
+            return "OpenClaw Gateway hooks 與預設小龍蝦造型"
         case .opencode:
             return "OpenCode 插件 hooks 会话"
         case .cursor:
@@ -108,7 +108,7 @@ enum MascotClient: String, CaseIterable, Identifiable, Sendable {
         case .copilot:
             return "GitHub Copilot Hooks 客户端"
         case .kimi:
-            return "Kimi CLI 官方 hooks 与默认 Kimi 形象"
+            return "Kimi CLI 官方 hooks 與預設 Kimi 造型"
         }
     }
 
@@ -319,11 +319,11 @@ enum MascotKind: String, CaseIterable, Identifiable, Sendable {
         case .hermes:
             return "翼盔信使狐"
         case .pi:
-            return "π 轨道终端星核"
+            return "π 軌道終端機星核"
         case .qwen:
-            return "薄荷围巾卡皮巴拉"
+            return "薄荷圍巾卡皮巴拉"
         case .openclaw:
-            return "双钳小龙虾"
+            return "雙鉗小龍蝦"
         case .opencode:
             return "高高的白色小章鱼"
         case .cursor:
@@ -335,7 +335,7 @@ enum MascotKind: String, CaseIterable, Identifiable, Sendable {
         case .copilot:
             return "黑框眼镜机器人"
         case .kimi:
-            return "Kimi 蓝色键盘球"
+            return "Kimi 藍色鍵盤球"
         }
     }
 

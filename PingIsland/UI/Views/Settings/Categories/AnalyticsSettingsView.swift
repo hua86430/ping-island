@@ -52,7 +52,7 @@ struct AgentUsageAnalyticsContent: View {
                     .font(.system(size: 18, weight: .bold))
                     .foregroundColor(.white.opacity(0.94))
 
-                Text(appLocalized: "查看 Agent、Token、工具调用与活跃概览")
+                Text(appLocalized: "檢視 Agent、Token、工具调用与活跃概览")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(.white.opacity(0.48))
             }

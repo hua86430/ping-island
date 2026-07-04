@@ -382,8 +382,8 @@ struct SessionListView: View {
         panel.allowsMultipleSelection = false
         panel.showsHiddenFiles = true
         panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-        panel.message = "选择 \(provider.displayName) Native Runtime 工作目录"
-        panel.prompt = "启动"
+        panel.message = "選擇 \(provider.displayName) Native Runtime 工作目錄"
+        panel.prompt = "啟動"
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
         sessionMonitor.startNativeSession(provider: provider, cwd: url.path)

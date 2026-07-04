@@ -34,9 +34,9 @@ enum UpdateConfigurationStatus: Equatable {
     var message: String {
         switch self {
         case .configured:
-            "更新源已准备就绪"
+            "更新來源已準備就緒"
         case .unconfigured:
-            "缺少 Sparkle 更新源或公钥配置"
+            "缺少 Sparkle 更新來源或公鑰設定"
         case .appStoreManaged:
             "更新由 Mac App Store 管理"
         }
@@ -70,11 +70,11 @@ final class UpdateManager: ObservableObject {
     }
 
     var releaseNotesActionTitle: String {
-        "版本历史由 App Store 管理"
+        "版本歷史由 App Store 管理"
     }
 
     var releaseNotesActionSubtitle: String {
-        "Mac App Store 版本不包含独立更新器"
+        "Mac App Store 版本不包含獨立更新器"
     }
 
     func start() {}
@@ -160,13 +160,13 @@ final class UpdateManager: NSObject, ObservableObject {
 
     var releaseNotesActionTitle: String {
         if let version = availableVersion {
-            return "查看 v\(version) 更新日志"
+            return "檢視 v\(version) 更新記錄"
         }
-        return "查看版本历史"
+        return "檢視版本歷史"
     }
 
     var releaseNotesActionSubtitle: String {
-        "使用独立弹窗查看 Markdown 更新日志"
+        "使用獨立彈出視窗檢視 Markdown 更新記錄"
     }
 
     private var automaticUpdateChecksEnabled: Bool {
@@ -414,7 +414,7 @@ final class UpdateManager: NSObject, ObservableObject {
     }
 
     private static var installedVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "当前版本"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "目前版本"
     }
 
     private static func preferredReleaseNotesURL(for item: SUAppcastItem) -> URL? {
@@ -529,11 +529,11 @@ final class UpdateManager: NSObject, ObservableObject {
             case .onLatestVersion, .onNewerThanLatestVersion, .unknown:
                 return .upToDate
             case .systemIsTooOld:
-                return .error(message: "当前系统版本过低，无法安装可用更新")
+                return .error(message: "目前系統版本過低，無法安裝可用更新")
             case .systemIsTooNew:
-                return .error(message: "当前系统版本过新，暂时没有兼容的更新")
+                return .error(message: "目前系統版本過新，暫時沒有相容的更新")
             case .hardwareDoesNotSupportARM64:
-                return .error(message: "当前设备架构不支持可用更新")
+                return .error(message: "目前裝置架構不支援可用更新")
             @unknown default:
                 return .upToDate
             }
@@ -545,7 +545,7 @@ final class UpdateManager: NSObject, ObservableObject {
 
         let message = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
         if message.isEmpty {
-            return .error(message: "更新失败，请稍后再试")
+            return .error(message: "更新失敗，請稍後再試")
         }
 
         return .error(message: message)
@@ -583,11 +583,11 @@ final class UpdateManager: NSObject, ObservableObject {
             if let statusCode = httpStatusCode(from: underlyingError) {
                 switch statusCode {
                 case 401, 403:
-                    return "更新源拒绝访问，请确认 appcast 发布资源仍可公开访问"
+                    return "更新來源拒絕存取，請確認 appcast 發布資源仍可公開存取"
                 case 404:
-                    return "更新源不可用：未找到已发布的 appcast.xml"
+                    return "更新來源不可用：未找到已發布的 appcast.xml"
                 case 500 ... 599:
-                    return "更新服务器暂时不可用，请稍后再试"
+                    return "更新伺服器暫時不可用，請稍後再試"
                 default:
                     break
                 }
@@ -596,11 +596,11 @@ final class UpdateManager: NSObject, ObservableObject {
             if underlyingError.domain == NSURLErrorDomain {
                 switch underlyingError.code {
                 case NSURLErrorNotConnectedToInternet:
-                    return "网络不可用，请检查连接后重试"
+                    return "網路不可用，請檢查連線後重試"
                 case NSURLErrorTimedOut:
-                    return "连接更新源超时，请稍后重试"
+                    return "連線更新來源逾時，請稍後重試"
                 case NSURLErrorCannotFindHost, NSURLErrorCannotConnectToHost, NSURLErrorDNSLookupFailed:
-                    return "无法连接更新源，请稍后再试"
+                    return "無法連線更新來源，請稍後再試"
                 default:
                     break
                 }

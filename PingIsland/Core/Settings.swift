@@ -141,7 +141,7 @@ enum UsageValueMode: String, CaseIterable, Identifiable {
         case .used:
             return "已用量"
         case .remaining:
-            return "剩余量"
+            return "剩餘量"
         }
     }
 }
@@ -161,13 +161,13 @@ enum AutoRoutePromptsIdleDelay: Int, CaseIterable, Identifiable {
     nonisolated var title: String {
         switch self {
         case .tenMinutes:
-            return "10 分钟"
+            return "10 分鐘"
         case .twentyMinutes:
-            return "20 分钟"
+            return "20 分鐘"
         case .thirtyMinutes:
-            return "30 分钟"
+            return "30 分鐘"
         case .sixtyMinutes:
-            return "1 小时"
+            return "1 小時"
         }
     }
 }
@@ -269,20 +269,20 @@ enum FloatingPetSizeMode: String, CaseIterable, Identifiable {
         case .automatic:
             return "自动"
         case .standard:
-            return "标准"
+            return "標準"
         case .large:
-            return "较大"
+            return "較大"
         }
     }
 
     var subtitle: String {
         switch self {
         case .automatic:
-            return "按显示器分辨率调整，高分屏会更醒目"
+            return "依顯示器解析度調整，高解析螢幕會更醒目"
         case .standard:
-            return "固定为旧版悬浮宠物尺寸"
+            return "固定為舊版懸浮寵物尺寸"
         case .large:
-            return "在所有显示器上放大宠物形象"
+            return "在所有顯示器上放大寵物造型"
         }
     }
 }
@@ -296,7 +296,7 @@ enum SubagentVisibilityMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .hidden:
-            return "不显示"
+            return "不顯示"
         case .visible:
             return "显示"
         }
@@ -305,9 +305,9 @@ enum SubagentVisibilityMode: String, CaseIterable, Identifiable {
     var subtitle: String {
         switch self {
         case .hidden:
-            return "主列表里隐藏挂靠在主 Agent 下的子 Agent 项"
+            return "主列表裡隱藏歸在主 Agent 下的子 Agent 項"
         case .visible:
-            return "主列表里将明确的子 Agent 挂靠在主 Agent 下展示"
+            return "主列表裡將明確的子 Agent 歸在主 Agent 下展示"
         }
     }
 
@@ -342,48 +342,48 @@ enum NotchPetStyle: String, CaseIterable, Identifiable {
         case .crab:
             return "小螃蟹"
         case .slime:
-            return "果冻史莱姆"
+            return "果凍史萊姆"
         case .cat:
-            return "团子猫"
+            return "團子貓"
         case .sittingCat:
-            return "坐着猫"
+            return "坐著貓"
         case .owl:
-            return "豆豆鸮"
+            return "豆豆鴞"
         case .snowyOwl:
-            return "雪团鸮"
+            return "雪團鴞"
         case .bee:
             return "小蜜蜂"
         case .roundBlob:
-            return "正面团子兽"
+            return "正面團子獸"
         case .antennaBean:
-            return "天线豆豆"
+            return "天線豆豆"
         case .tinyDino:
-            return "侧身小恐龙"
+            return "側身小恐龍"
         }
     }
 
     var subtitle: String {
         switch self {
         case .crab:
-            return "经典横向步行动画"
+            return "經典橫向步行動畫"
         case .slime:
-            return "软弹变形与高光晃动"
+            return "軟彈變形與高光晃動"
         case .cat:
-            return "尾巴摆动和眨眼反馈"
+            return "尾巴擺動和眨眼回饋"
         case .sittingCat:
-            return "一直端坐，支持更多表情动作"
+            return "一直端坐，支援更多表情動作"
         case .owl:
-            return "轻拍翅膀和点头观察"
+            return "輕拍翅膀和點頭觀察"
         case .snowyOwl:
-            return "圆脸立姿与扑翼巡航"
+            return "圓臉立姿與撲翼巡航"
         case .bee:
-            return "条纹圆身与振翅动画"
+            return "條紋圓身與振翅動畫"
         case .roundBlob:
-            return "早期口袋宠物式正面团子构图"
+            return "早期口袋寵物式正面團子構圖"
         case .antennaBean:
-            return "大头小身与双角剪影"
+            return "大頭小身與雙角剪影"
         case .tinyDino:
-            return "侧身尾巴外扩的经典小兽构图"
+            return "側身尾巴外擴的經典小獸構圖"
         }
     }
 }

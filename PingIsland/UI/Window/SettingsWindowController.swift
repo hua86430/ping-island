@@ -710,7 +710,7 @@ private struct PresentationModeWelcomeView: View {
                         .foregroundColor(.white.opacity(0.70))
                         .fixedSize(horizontal: false, vertical: true)
 
-                    Text(appLocalized: "进入独立悬浮宠物模式后，右键宠物形象可重新打开设置面板。")
+                    Text(appLocalized: "进入独立悬浮宠物模式后，右键宠物造型可重新打开设置面板。")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundColor(.white.opacity(0.60))
                         .fixedSize(horizontal: false, vertical: true)

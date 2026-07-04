@@ -16,6 +16,9 @@ run_step() {
 
 cd "$PROJECT_DIR"
 
+run_step "Simplified Chinese Guard" \
+    swift scripts/check-simplified-chinese.swift
+
 run_step "Prototype Tests" \
     swift test --package-path Prototype
 

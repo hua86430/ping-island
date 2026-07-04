@@ -474,7 +474,7 @@ struct SessionClientInfo: Codable, Equatable, Sendable {
             return nil
         }
 
-        return "\(ideTitle) 终端"
+        return "\(ideTitle) 終端機"
     }
 
     nonisolated var terminalSourceDisplayName: String? {
@@ -1077,8 +1077,8 @@ struct SessionIntervention: Equatable, Identifiable, Sendable {
 
     nonisolated var externalContinuationStatusMessage: String? {
         guard awaitsExternalContinuation else { return nil }
-        let actorName = metadata["continuationActorName"] ?? "客户端"
-        return "\(actorName) 有问题需要介入处理，可通过上方按钮快速打开并继续操作"
+        let actorName = metadata["continuationActorName"] ?? "客戶端"
+        return "\(actorName) 有問題需要介入處理，可透過上方按鈕快速開啟並繼續操作"
     }
 
     nonisolated var submittedAnswers: [String: [String]] {

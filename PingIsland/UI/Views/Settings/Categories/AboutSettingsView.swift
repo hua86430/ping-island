@@ -18,15 +18,15 @@ struct AboutSettingsView: View {
                 SettingsValueLine(title: "之前版本", value: previousVersion)
             }
 
-            SettingsSectionCard(title: "隐私与分析") {
+            SettingsSectionCard(title: "隱私與分析") {
                 SettingsToggleLine(
-                    title: "匿名使用统计",
+                    title: "匿名使用統計",
                     subtitle: "匿名统计启动、功能使用、Hook 安装和会话状态；不包含内容、代码、路径或主机信息。",
                     isOn: $settings.analyticsEnabled
                 )
                 SettingsLineDivider()
                 SettingsInfoLine(
-                    title: "采集范围",
+                    title: "蒐集範圍",
                     subtitle: "未同意前不上传；开启后有每日上限，可随时关闭。"
                 ) {
                     Image(systemName: "lock.shield")
@@ -56,8 +56,8 @@ struct AboutSettingsView: View {
                     SettingsLineDivider()
 
                     SettingsActionLine(
-                        title: "立即重启安装",
-                        subtitle: "不等待空闲，立即退出 Ping Island 并完成已下载的更新"
+                        title: "立即重啟安裝",
+                        subtitle: "不等待空閒，立即結束 Ping Island 並完成已下載的更新"
                     ) {
                         updateManager.installAndRelaunch()
                     } accessory: {

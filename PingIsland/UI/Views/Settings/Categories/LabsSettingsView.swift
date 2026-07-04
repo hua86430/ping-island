@@ -3,7 +3,7 @@ import SwiftUI
 struct LabsSettingsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 18) {
-            SettingsSectionCard(title: "实验室") {
+            SettingsSectionCard(title: "實驗室") {
                 LabsEmptyStateView()
             }
         }
@@ -27,11 +27,11 @@ struct LabsEmptyStateView: View {
                 )
 
             VStack(alignment: .center, spacing: 6) {
-                Text("暂无可用实验")
+                Text("暫無可用實驗")
                     .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
 
-                Text("实验室主要承载一些试验性特性，稳定性不做保障。当前没有开放中的实验项目。")
+                Text("實驗室主要承載一些實驗性功能，穩定性不保證。目前沒有開放中的實驗項目。")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.white.opacity(0.58))
                     .multilineTextAlignment(.center)

@@ -76,7 +76,7 @@ enum SessionConversationPreviewBuilder {
                 let label = MCPToolFormatter.formatToolName(tool.name)
                 return session.codexSubagentSummaryText(for: preview.map { "\(label) \($0)" } ?? label)
             case .interrupted:
-                return session.codexSubagentSummaryText(for: "已中断")
+                return session.codexSubagentSummaryText(for: "已中斷")
             case .user:
                 continue
             }

@@ -721,6 +721,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
             "busy",
             "work in progress",
             "codex is still working",
+            // i18n:simplified-matcher-start — matches incoming (Simplified) agent text; do NOT convert.
             "工作中",
             "处理中",
             "正在处理",
@@ -729,6 +730,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
             "准备中",
             "运行中",
             "正在压缩上下文"
+            // i18n:simplified-matcher-end
         ]
         if exactMatches.contains(normalized) {
             return true
@@ -741,11 +743,13 @@ struct SessionState: Equatable, Identifiable, Sendable {
             "thinking",
             "loading",
             "compacting context",
+            // i18n:simplified-matcher-start — matches incoming (Simplified) agent text; do NOT convert.
             "工作中",
             "处理中",
             "正在处理",
             "思考中",
             "压缩上下文"
+            // i18n:simplified-matcher-end
         ]
         return containsMatches.contains { normalized.contains($0) }
     }
@@ -793,6 +797,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
             "work in progress",
             "idle",
             "ready",
+            // i18n:simplified-matcher-start — matches incoming (Simplified) agent text; do NOT convert.
             "工作中",
             "处理中",
             "正在处理",
@@ -800,6 +805,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
             "加载中",
             "准备中",
             "运行中"
+            // i18n:simplified-matcher-end
         ]
         if exactMatches.contains(normalized) {
             return true
@@ -813,10 +819,12 @@ struct SessionState: Equatable, Identifiable, Sendable {
             "loading",
             "running",
             "waiting",
+            // i18n:simplified-matcher-start — matches incoming (Simplified) agent text; do NOT convert.
             "工作中",
             "处理中",
             "正在处理",
             "思考中"
+            // i18n:simplified-matcher-end
         ]
         return containsMatches.contains { normalized.contains($0) }
     }

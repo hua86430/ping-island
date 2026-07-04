@@ -32,7 +32,7 @@ struct DisplaySettingsView: View {
 
                 SettingsInfoLine(
                     title: "默认宠物形象",
-                    subtitle: "设置展示模式示意图，以及没有活跃或待处理会话时刘海/悬浮宠物使用的默认形象。"
+                    subtitle: "設定展示模式示意圖，以及沒有活躍或待處理工作階段時瀏海/懸浮寵物使用的預設造型。"
                 ) {
                     DisplayPreviewMascotPicker(kind: $settings.previewMascotKind)
                 }
@@ -96,8 +96,8 @@ struct DisplaySettingsView: View {
                     FloatingPetPlacementInfoCard()
                     SettingsLineDivider()
                     SettingsInfoLine(
-                        title: "宠物大小",
-                        subtitle: "自动模式会根据当前显示器分辨率调整；也可以固定为标准尺寸或始终放大。"
+                        title: "寵物大小",
+                        subtitle: "自動模式會根據目前顯示器解析度調整；也可以固定為標準尺寸或始終放大。"
                     ) {
                         FloatingPetSizeModePicker(mode: $settings.floatingPetSizeMode)
                     }
@@ -170,7 +170,7 @@ struct DisplaySettingsView: View {
                     subtitle: "将设置面板恢复到默认宽高，适合窗口被拉大或缩小时快速回到推荐布局。"
                 ) {
                     HookManagementButton(
-                        title: "重置",
+                        title: "重設",
                         tint: SettingsCategory.display.tint,
                         action: resetSettingsPanelSize
                     )
@@ -226,7 +226,7 @@ struct FloatingPetSizeModePicker: View {
             }
         }
         .labelsHidden()
-        .accessibilityLabel(Text(appLocalized: "宠物大小"))
+        .accessibilityLabel(Text(appLocalized: "寵物大小"))
         .settingsMenuPicker(width: 132)
         .help(AppLocalization.string(mode.subtitle))
     }
@@ -510,7 +510,7 @@ struct FloatingPetPlacementInfoCard: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(.white)
 
-            Text(appLocalized: "独立悬浮宠物默认贴近当前激活窗口右下角显示。拖动后会记住新位置，右键宠物形象可重新打开设置面板。")
+            Text(appLocalized: "独立悬浮宠物默认贴近当前激活窗口右下角显示。拖动后会记住新位置，右键宠物造型可重新打开设置面板。")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.white.opacity(0.58))
                 .fixedSize(horizontal: false, vertical: true)
@@ -761,7 +761,7 @@ struct SubagentVisibilityPicker: View {
     var body: some View {
         Picker("", selection: $mode) {
             ForEach(SubagentVisibilityMode.allCases) { candidate in
-                Text(candidate.title).tag(candidate)
+                Text(appLocalized: candidate.title).tag(candidate)
             }
         }
         .labelsHidden()

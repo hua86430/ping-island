@@ -1042,10 +1042,10 @@ actor ConversationParser {
                 .joined(separator: " / ")
 
             if normalizedAnswers.isEmpty {
-                return "问题：\(question)"
+                return "問題：\(question)"
             }
 
-            return "问题：\(question)\n回答：\(normalizedAnswers)"
+            return "問題：\(question)\n回答：\(normalizedAnswers)"
         }
 
         guard !formattedSections.isEmpty else { return nil }
@@ -1237,8 +1237,8 @@ actor ConversationParser {
         guard !parsedQuestions.isEmpty else { return nil }
 
         let title = parsedQuestions.count == 1
-            ? "\(actorName) 的提问"
-            : "\(actorName) 的提问（\(parsedQuestions.count) 个问题）"
+            ? "\(actorName) 的提問"
+            : "\(actorName) 的提問（\(parsedQuestions.count) 個問題）"
         var metadata: [String: String] = [
             "source": "codebuddy_cli_transcript",
             "toolName": pending.toolName,
@@ -1255,7 +1255,7 @@ actor ConversationParser {
             id: responseToolUseId ?? pending.callId,
             kind: .question,
             title: title,
-            message: "\(actorName) 需要你补充回答，提交后会继续执行当前会话。",
+            message: "\(actorName) 需要你補充回答，提交後會繼續執行目前工作階段。",
             options: [],
             questions: parsedQuestions,
             supportsSessionScope: false,
@@ -1477,14 +1477,14 @@ actor ConversationParser {
             .first ?? 1
 
         let title = questionCount == 1
-            ? "Qoder 的提问"
-            : "Qoder 的提问（\(questionCount) 个问题）"
+            ? "Qoder 的提問"
+            : "Qoder 的提問（\(questionCount) 個問題）"
 
         return SessionIntervention(
             id: "qoder-question-\(latestSection.requestId)",
             kind: .question,
             title: title,
-            message: "Qoder 已在 IDE 内弹出问题，请回到 Qoder 完成回答。Island 会继续保留提醒，直到会话继续推进。",
+            message: "Qoder 已在 IDE 內彈出問題，請回到 Qoder 完成回答。Island 會繼續保留提醒，直到工作階段繼續推進。",
             options: [],
             questions: [],
             supportsSessionScope: false,

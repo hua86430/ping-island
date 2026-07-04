@@ -15,11 +15,12 @@ Conventions for this plan:
 ## Task 0 — Land the guard scanner first (fail-first)
 
 - [ ] Create `scripts/check-simplified-chinese.swift` containing the ICU `Hans-Hant` per-character scanner (below). It scans `PingIsland/` app code (exclude `PingIslandTests/`, `PingIslandUITests/`) + `PingIsland/Resources/zh-Hant.lproj/Localizable.strings` VALUES, flags any character whose single-char Hans→Hant transform changes it, and exits non-zero on any hit not in the whitelist.
-- [ ] Whitelist exactly the §4.5 matcher lines by `file:line` (SessionState + SessionStore ranges) so they are allowed to stay Simplified.
+- [ ] Whitelist the §4.5 matcher blocks by **inline block markers**, not `file:line` (line numbers drift). Wrap each matcher region in `// i18n:simplified-matcher-start` … `// i18n:simplified-matcher-end`; the scanner skips flagged literals inside a marked block. Applied to: the 4 progress-matcher arrays in `SessionState.swift` and the 2 Qoder-question matcher functions in `SessionStore.swift`.
 - [ ] Scanner logic (reuse the audit scanner):
   - `StringTransform("Hans-Hant")`; a char is flagged if `String(char).applyingTransform(t, reverse:false) != String(char)` and scalar in `0x3400…0x9FFF`.
-  - `.strings`: parse `"key" = "value";`, check VALUE only.
-  - Swift: extract string literals via regex, skip pure-comment lines, report `file:line` + literal.
+  - `.strings`: parse `"key" = "value";`, collect the KEY set, check the VALUE only.
+  - Swift: extract string literals (in-string/comment state machine, stops at `//`), skip literals inside `i18n:simplified-matcher-*` blocks.
+  - Key-aware rule: a Simplified Swift literal is a violation UNLESS it is a resolved `zh-Hant` KEY (then its Traditional value drives display and is validated by the value scan). This unifies §4.3 missing-key fallbacks and §4.4 raw literals: adding a `zh-Hant` value (Task 2) OR converting the literal (Tasks 3–6) both clear it.
   - Print each violation; `exit(1)` if any non-whitelisted violation remains.
 - [ ] Run it now and confirm it FAILS with the known ~120 display + 2 value + 41 missing-key findings (proves the guard detects the problem before any fix).
 - [ ] Verify: `swift scripts/check-simplified-chinese.swift; echo "exit=$?"` → prints violations, `exit=1`.
@@ -119,12 +120,11 @@ Convert Simplified literals rendered via `Text(verbatim:)` / `Text(String)` / in
 
 ## Task 7 — Confirm matchers stay Simplified (whitelist audit)
 
-These MUST remain Simplified (spec §4.5) because they match Simplified agent output. Verify no task touched them.
+These MUST remain Simplified (spec §4.5) because they match Simplified agent output. Verify no task touched their content, only wrapped them.
 
-- [ ] `PingIsland/Models/SessionState.swift:725,726,728,729,731,745,746,748,797,798,800,801,817,818` unchanged.
-- [ ] `PingIsland/Services/State/SessionStore.swift:4243,4244,4252,4253,4268,4269,4270,4271,4280,4281,4287,4288` unchanged.
-- [ ] Confirm the scanner whitelist covers exactly these lines and nothing else.
-- [ ] Verify: `git diff PingIsland/Models/SessionState.swift PingIsland/Services/State/SessionStore.swift` shows no change inside these ranges.
+- [ ] `SessionState.swift`: the 4 progress-matcher arrays (`exactMatches`/`containsMatches` compared against `normalized`) are wrapped in `i18n:simplified-matcher-*` and their Simplified entries are unchanged.
+- [ ] `SessionStore.swift`: `qoderQuestionIntentCount` + `looksLikeQoderQuestionPromptRequest` matcher literals/regex are wrapped and unchanged (the DISPLAY strings above them — question card title/message — ARE converted to Traditional).
+- [ ] Confirm the scanner reports zero hits in both files (markers make the matcher content exempt; any Simplified outside the markers would still fail).
 
 ---
 

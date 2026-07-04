@@ -321,7 +321,7 @@ struct RemoteHostManagementLine: View {
             return nil
         }
 
-        let attachDisconnectPrefix = "SSH attach 已断开: "
+        let attachDisconnectPrefix = "SSH attach 已斷線: "
         if lastError.hasPrefix(attachDisconnectPrefix) {
             let detail = String(lastError.dropFirst(attachDisconnectPrefix.count))
             return AppLocalization.format("SSH attach 已断开: %@", detail)

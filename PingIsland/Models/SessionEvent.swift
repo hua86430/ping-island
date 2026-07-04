@@ -379,8 +379,8 @@ extension HookEvent {
             return SessionIntervention(
                 id: toolUseId ?? "codebuddy-cli-notification-\(sessionId)",
                 kind: .question,
-                title: "\(actorName) 请求处理",
-                message: "\(actorName) 正在等待权限处理。请打开 \(actorName) 继续；如果收到可响应请求，Island 会展示完整选项。",
+                title: "\(actorName) 請求處理",
+                message: "\(actorName) 正在等待權限處理。請開啟 \(actorName) 繼續；如果收到可回應請求，Island 會展示完整選項。",
                 options: [],
                 questions: [],
                 supportsSessionScope: false,
@@ -449,8 +449,8 @@ extension HookEvent {
         guard !parsedQuestions.isEmpty else { return nil }
 
         let title = parsedQuestions.count == 1
-            ? "\(actorName) 的提问"
-            : "\(actorName) 的提问（\(parsedQuestions.count) 个问题）"
+            ? "\(actorName) 的提問"
+            : "\(actorName) 的提問（\(parsedQuestions.count) 個問題）"
         var metadata: [String: String] = ["toolName": "AskUserQuestion"]
         if let toolInputJSONObject,
            let data = try? JSONSerialization.data(withJSONObject: toolInputJSONObject, options: [.sortedKeys]),
@@ -464,9 +464,9 @@ extension HookEvent {
         let message: String
         if isExternalClientQuestionEvent {
             metadata["responseMode"] = "external_only"
-            message = "\(actorName) 已在客户端内发起提问，请切回 \(actorName) 完成回答。Island 暂不支持直接提交这类回答。"
+            message = "\(actorName) 已在客戶端內發起提問，請切回 \(actorName) 完成回答。Island 暫不支援直接提交這類回答。"
         } else {
-            message = "\(actorName) 需要你补充回答，提交后会继续执行当前会话。"
+            message = "\(actorName) 需要你補充回答，提交後會繼續執行目前工作階段。"
         }
 
         return SessionIntervention(

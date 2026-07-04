@@ -480,7 +480,7 @@ final class SessionStateTests: XCTestCase {
 
         XCTAssertEqual(session.scopedApprovalAction, .autoApprove)
         XCTAssertTrue(session.supportsSessionScopedApproval)
-        XCTAssertEqual(session.clientInfo.ideHostBadgeLabel(for: .claude), "Qoder 终端")
+        XCTAssertEqual(session.clientInfo.ideHostBadgeLabel(for: .claude), "Qoder 終端機")
     }
 
     func testQoderWaitingForApprovalDoesNotExposeClaudeAutoApproveAction() {
@@ -1497,7 +1497,7 @@ final class SessionStateTests: XCTestCase {
         )
 
         XCTAssertNil(session.terminalSourceBadgeLabel)
-        XCTAssertEqual(session.ideHostBadgeLabel, "Cursor 终端")
+        XCTAssertEqual(session.ideHostBadgeLabel, "Cursor 終端機")
     }
 
     func testIDEHostedQoderNormalizationKeepsIDEIdentity() {
@@ -2409,7 +2409,7 @@ final class SessionStateTests: XCTestCase {
 
         XCTAssertEqual(
             messages.first?.textContent,
-            "问题：你对项目有什么具体想法或需求？（可选） 回答：还没想好，需要你推荐"
+            "問題：你对项目有什么具体想法或需求？（可选） 回答：还没想好，需要你推荐"
         )
     }
 

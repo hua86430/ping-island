@@ -736,14 +736,14 @@ final class RemoteConnectorManager: ObservableObject {
             } catch {
                 let arch = RemoteConnectorManager.normalizedLinuxBridgeArchitecture(probe.architecture) ?? probe.architecture
                 let manualHint = """
-                SCP 传输失败，请在远程主机上手动安装 PingIslandBridge：
+                SCP 傳輸失敗，請在遠端主機上手動安裝 PingIslandBridge：
                 
                   mkdir -p \(endpoint.remoteInstallRoot)/bin
                   curl -L -o /tmp/bridge.zip https://github.com/hua86430/ping-island/releases/latest/download/PingIslandBridge-linux-musl-\(arch).zip
                   unzip -o /tmp/bridge.zip -d \(endpoint.remoteInstallRoot)/bin/
                   chmod 755 \(endpoint.remoteInstallRoot)/bin/PingIslandBridge
                 
-                安装完成后重新连接即可。
+                安裝完成後重新連線即可。
                 """
                 logger.error("Remote bootstrap SCP failed: \(error.localizedDescription, privacy: .public)")
                 throw RemoteConnectorError.sshFailure(manualHint)
@@ -1838,7 +1838,7 @@ private final class RemoteAttachConnector {
                 nil
             } else {
                 RemoteConnectorError.sshFailure(
-                    stderr.isEmpty ? "SSH attach 已断开" : "SSH attach 已断开: \(Self.excerpt(stderr))"
+                    stderr.isEmpty ? "SSH attach 已断开" : "SSH attach 已斷線: \(Self.excerpt(stderr))"
                 )
             }
 
@@ -1992,7 +1992,7 @@ private enum RemoteSSHCommandRunner {
             .split(separator: "\n", omittingEmptySubsequences: false)
             .map(String.init)
         guard lines.count >= 7 else {
-            throw RemoteConnectorError.sshFailure("远程主机返回的信息不完整")
+            throw RemoteConnectorError.sshFailure("遠端主機回傳的資訊不完整")
         }
         let fingerprint = localKnownHostFingerprint(for: target, port: port)
         logger.notice(
@@ -2065,7 +2065,7 @@ private enum RemoteSSHCommandRunner {
         )
         guard result.exitCode == 0 else {
             let detail = result.stderr.isEmpty ? result.stdout : result.stderr
-            throw RemoteConnectorError.sshFailure("写入远程文件失败 \(remotePath): \(detail)")
+            throw RemoteConnectorError.sshFailure("寫入遠端檔案失敗 \(remotePath): \(detail)")
         }
     }
 
@@ -2392,7 +2392,7 @@ private final class RemoteBridgeAssetResolver {
 
         throw RemoteConnectorError.remoteBridgeDownloadFailed(
             AppLocalization.format(
-                "无法从 GitHub Release 下载 Linux 远程 bridge：%@",
+                "無法從 GitHub Release 下載 Linux 遠端 bridge：%@",
                 downloadFailures.joined(separator: "；")
             )
         )

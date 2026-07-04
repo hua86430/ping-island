@@ -153,7 +153,7 @@ final class HookWalkthroughDemoRunner {
                         [
                             "id": "review",
                             "label": AppLocalization.string("检查后继续"),
-                            "description": AppLocalization.string("模拟先查看风险，再批准继续。")
+                            "description": AppLocalization.string("模拟先檢視风险，再批准继续。")
                         ]
                     ]
                 ]
@@ -195,7 +195,7 @@ final class HookWalkthroughDemoRunner {
                             SessionInterventionOption(
                                 id: "review",
                                 title: AppLocalization.string("检查后继续"),
-                                detail: AppLocalization.string("模拟先查看风险，再批准继续。")
+                                detail: AppLocalization.string("模拟先檢視风险，再批准继续。")
                             )
                         ],
                         allowsMultiple: false,

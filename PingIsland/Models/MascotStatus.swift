@@ -12,7 +12,7 @@ enum MascotStatus: String, Codable, CaseIterable, Sendable {
         case .idle: return "空闲中"
         case .working: return "运行中"
         case .warning: return "警告状态"
-        case .dragging: return "拖拽中"
+        case .dragging: return "拖曳中"
         }
     }
 }

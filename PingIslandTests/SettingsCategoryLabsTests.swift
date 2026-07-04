@@ -31,8 +31,8 @@ final class SettingsCategoryLabsTests: XCTestCase {
     }
 
     func testLabsCategoryLabelsExperimentalContent() {
-        XCTAssertEqual(SettingsCategory.labs.title, "实验室")
-        XCTAssertEqual(SettingsCategory.labs.subtitle, "试验性特性")
+        XCTAssertEqual(SettingsCategory.labs.title, "實驗室")
+        XCTAssertEqual(SettingsCategory.labs.subtitle, "實驗性功能")
         XCTAssertEqual(SettingsCategory.labs.icon, "flask.fill")
     }
 }

@@ -24,7 +24,7 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .analytics: return "统计"
         case .integration: return "集成"
         case .remote: return "远程"
-        case .labs: return "实验室"
+        case .labs: return "實驗室"
         case .about: return "关于"
         }
     }
@@ -36,10 +36,10 @@ enum SettingsCategory: String, CaseIterable, Identifiable {
         case .display: return "显示器与位置"
         case .mascot: return "客户端宠物与动作"
         case .sound: return "通知与提示音"
-        case .analytics: return "Agent、Token 与工具"
+        case .analytics: return "Agent、Token 與工具"
         case .integration: return "Hooks 与 IDE 扩展"
         case .remote: return "SSH 主机与远程转发"
-        case .labs: return "试验性特性"
+        case .labs: return "實驗性功能"
         case .about: return "版本与更新"
         }
     }

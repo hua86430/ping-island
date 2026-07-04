@@ -90,7 +90,7 @@ struct SoundSettingsContent: View {
                     }
 
                     if soundPacks.availablePacks.isEmpty {
-                        SettingsValueLine(title: "可用主题包", value: "未发现")
+                        SettingsValueLine(title: "可用主题包", value: "未發現")
                     } else {
                         SettingsValueLine(title: "可用主题包", value: "\(soundPacks.availablePacks.count)")
                     }
@@ -387,7 +387,7 @@ struct SoundPreviewButton: View {
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)
-        .help("试听")
+        .help("試聽")
     }
 }
 

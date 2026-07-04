@@ -220,7 +220,7 @@ enum UsageSummaryPresenter {
 
         switch locale.language.languageCode?.identifier {
         case "zh":
-            return "\(duration) 後重置"
+            return "\(duration) 後重設"
         default:
             return "Resets in \(duration)"
         }

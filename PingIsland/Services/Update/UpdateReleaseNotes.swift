@@ -32,19 +32,19 @@ struct UpdateReleaseNotesSection: Equatable, Identifiable, Sendable {
     var iconSymbolName: String {
         let normalizedTitle = title.lowercased()
 
-        if normalizedTitle.contains("亮点") || normalizedTitle.contains("highlight") {
+        if normalizedTitle.contains("亮點") || normalizedTitle.contains("highlight") {
             return "sparkles"
         }
 
-        if normalizedTitle.contains("修复") || normalizedTitle.contains("fix") {
+        if normalizedTitle.contains("修復") || normalizedTitle.contains("fix") {
             return "wrench.and.screwdriver"
         }
 
-        if normalizedTitle.contains("说明") || normalizedTitle.contains("note") {
+        if normalizedTitle.contains("說明") || normalizedTitle.contains("note") {
             return "info.circle"
         }
 
-        if normalizedTitle.contains("关联 pr") || normalizedTitle.contains("related pr") || normalizedTitle.contains("pr") {
+        if normalizedTitle.contains("關聯 pr") || normalizedTitle.contains("related pr") || normalizedTitle.contains("pr") {
             return "arrow.triangle.branch"
         }
 
@@ -73,7 +73,7 @@ enum UpdateReleaseNotesParser {
         }
 
         var sections: [UpdateReleaseNotesSection] = []
-        var currentTitle = "更新内容"
+        var currentTitle = "更新內容"
         var currentLines: [String] = []
         var sectionIndex = 0
 

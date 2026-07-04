@@ -747,7 +747,7 @@ struct NotchView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .font(.system(size: min(16, iconOnlySize), weight: .semibold))
                     .foregroundStyle(closedIndicatorTone.emphasisColor)
-                    .accessibilityLabel("需要处理")
+                    .accessibilityLabel("需要處理")
             } else {
                 MascotView(
                     kind: closedMascotKind,
@@ -1869,7 +1869,7 @@ private struct NotchSettingsButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help("设置")
+        .help("設定")
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.12)) {
                 isHovering = hovering

@@ -473,7 +473,7 @@ final class SettingsPanelViewModel: ObservableObject {
         }
 
         return AppLocalization.format(
-            "检测到 Qoder CLI %@；启动时会刷新 Island 托管的 Qoder CLI hooks，并保留同一 ~/.qoder/settings.json 内的 Qoder IDE hooks 与其他 JSON 配置。",
+            "偵測到 Qoder CLI %@；啟動時會重新整理 Island 託管的 Qoder CLI hooks，並保留同一 ~/.qoder/settings.json 內的 Qoder IDE hooks 與其他 JSON 設定。",
             status.version
         )
     }

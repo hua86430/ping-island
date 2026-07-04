@@ -27,7 +27,7 @@ struct MascotSettingsView: View {
             Text(appLocalized: "客户端宠物")
                 .font(.title2.bold())
 
-            Text(appLocalized: "每个客户端都有默认专属形象，你也可以在这里单独改成别的宠物。刘海、会话列表和 hover 预览都会同步使用这里的配置。")
+            Text(appLocalized: "每个客户端都有默认专属造型，你也可以在这里单独改成别的宠物。刘海、会话列表和 hover 预览都会同步使用这里的配置。")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)

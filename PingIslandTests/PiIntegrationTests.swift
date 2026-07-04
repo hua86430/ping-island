@@ -88,7 +88,7 @@ final class PiIntegrationTests: XCTestCase {
         XCTAssertEqual(MascotClient(clientInfo: clientInfo, provider: .claude), .pi)
         XCTAssertEqual(MascotKind(clientInfo: clientInfo, provider: .claude), .pi)
         XCTAssertEqual(MascotClient.pi.defaultMascotKind, .pi)
-        XCTAssertEqual(MascotClient.pi.subtitle, "Pi extension hooks 与终端云团")
-        XCTAssertEqual(MascotKind.pi.subtitle, "π 轨道终端星核")
+        XCTAssertEqual(MascotClient.pi.subtitle, "Pi extension hooks 與終端機雲團")
+        XCTAssertEqual(MascotKind.pi.subtitle, "π 軌道終端機星核")
     }
 }

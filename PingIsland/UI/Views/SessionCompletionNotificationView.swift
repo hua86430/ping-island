@@ -86,7 +86,7 @@ enum SessionCompletionPreviewBuilder {
                 let label = MCPToolFormatter.formatToolName(tool.name)
                 return preview.map { "\(label) \($0)" } ?? label
             case .interrupted:
-                return "已中断"
+                return "已中斷"
             case .user:
                 continue
             }

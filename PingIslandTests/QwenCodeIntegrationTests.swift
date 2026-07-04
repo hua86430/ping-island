@@ -58,7 +58,7 @@ final class QwenCodeIntegrationTests: XCTestCase {
         XCTAssertEqual(event.intervention?.kind, .question)
         XCTAssertTrue(event.intervention?.supportsInlineResponse ?? false)
         XCTAssertNil(event.intervention?.metadata["responseMode"])
-        XCTAssertTrue(event.intervention?.message.contains("提交后会继续执行") ?? false)
+        XCTAssertTrue(event.intervention?.message.contains("提交後會繼續執行") ?? false)
     }
 
     func testQwenCodeManagedProfileUsesOfficialHooksSettings() {
@@ -102,8 +102,8 @@ final class QwenCodeIntegrationTests: XCTestCase {
         XCTAssertTrue(clientInfo.prefersHookMessageAsLastMessageFallback)
         XCTAssertEqual(MascotClient(clientInfo: clientInfo, provider: .claude), .qwen)
         XCTAssertEqual(MascotKind(clientInfo: clientInfo, provider: .claude), .qwen)
-        XCTAssertEqual(MascotClient.qwen.subtitle, "Qwen Code 官方 hooks 与薄荷围巾卡皮巴拉")
-        XCTAssertEqual(MascotKind.qwen.subtitle, "薄荷围巾卡皮巴拉")
+        XCTAssertEqual(MascotClient.qwen.subtitle, "Qwen Code 官方 hooks 與薄荷圍巾卡皮巴拉")
+        XCTAssertEqual(MascotKind.qwen.subtitle, "薄荷圍巾卡皮巴拉")
     }
 
     func testQwenCodeLastMessageFallsBackToHookMessageForPopupPreview() {

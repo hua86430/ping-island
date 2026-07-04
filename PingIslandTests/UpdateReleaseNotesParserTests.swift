@@ -27,7 +27,7 @@ final class UpdateReleaseNotesParserTests: XCTestCase {
         let sections = UpdateReleaseNotesParser.sections(from: markdown)
 
         XCTAssertEqual(sections.count, 1)
-        XCTAssertEqual(sections[0].title, "更新内容")
+        XCTAssertEqual(sections[0].title, "更新內容")
         XCTAssertTrue(sections[0].markdown.contains("第一条"))
     }
 
@@ -157,19 +157,19 @@ final class UpdateReleaseNotesParserTests: XCTestCase {
 
     func testSectionIconMappingUsesDifferentSymbolsPerSectionType() {
         XCTAssertEqual(
-            UpdateReleaseNotesSection(id: "1", title: "亮点", markdown: "").iconSymbolName,
+            UpdateReleaseNotesSection(id: "1", title: "亮點", markdown: "").iconSymbolName,
             "sparkles"
         )
         XCTAssertEqual(
-            UpdateReleaseNotesSection(id: "2", title: "修复", markdown: "").iconSymbolName,
+            UpdateReleaseNotesSection(id: "2", title: "修復", markdown: "").iconSymbolName,
             "wrench.and.screwdriver"
         )
         XCTAssertEqual(
-            UpdateReleaseNotesSection(id: "3", title: "说明", markdown: "").iconSymbolName,
+            UpdateReleaseNotesSection(id: "3", title: "說明", markdown: "").iconSymbolName,
             "info.circle"
         )
         XCTAssertEqual(
-            UpdateReleaseNotesSection(id: "4", title: "关联 PR", markdown: "").iconSymbolName,
+            UpdateReleaseNotesSection(id: "4", title: "關聯 PR", markdown: "").iconSymbolName,
             "arrow.triangle.branch"
         )
     }

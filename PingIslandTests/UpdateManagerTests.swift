@@ -63,7 +63,7 @@ final class UpdateManagerTests: XCTestCase {
 
         XCTAssertEqual(
             UpdateManager.terminalState(forUpdateCycleError: error),
-            .error(message: "当前系统版本过低，无法安装可用更新")
+            .error(message: "目前系統版本過低，無法安裝可用更新")
         )
     }
 
@@ -98,7 +98,7 @@ final class UpdateManagerTests: XCTestCase {
 
         XCTAssertEqual(
             UpdateManager.terminalState(forUpdateCycleError: error),
-            .error(message: "更新源不可用：未找到已发布的 appcast.xml")
+            .error(message: "更新來源不可用：未找到已發布的 appcast.xml")
         )
     }
 
@@ -120,7 +120,7 @@ final class UpdateManagerTests: XCTestCase {
 
         XCTAssertEqual(
             UpdateManager.terminalState(forUpdateCycleError: error),
-            .error(message: "网络不可用，请检查连接后重试")
+            .error(message: "網路不可用，請檢查連線後重試")
         )
     }
 }

@@ -89,7 +89,7 @@ final class QoderWorkHookEventTimingTests: XCTestCase {
         XCTAssertEqual(event.intervention?.id, "call_123")
         XCTAssertFalse(event.intervention?.supportsInlineResponse ?? true)
         XCTAssertEqual(event.intervention?.metadata["responseMode"], "external_only")
-        XCTAssertTrue(event.intervention?.message.contains("暂不支持直接提交") ?? false)
+        XCTAssertTrue(event.intervention?.message.contains("暫不支援直接提交") ?? false)
         XCTAssertEqual(event.determinePhase(), .waitingForInput)
         XCTAssertFalse(event.shouldFilterBeforeApprovalHandling)
     }
@@ -236,7 +236,7 @@ final class QoderWorkHookEventTimingTests: XCTestCase {
         XCTAssertEqual(event.intervention?.id, "call_workbuddy_123")
         XCTAssertFalse(event.intervention?.supportsInlineResponse ?? true)
         XCTAssertEqual(event.intervention?.metadata["responseMode"], "external_only")
-        XCTAssertTrue(event.intervention?.message.contains("暂不支持直接提交") ?? false)
+        XCTAssertTrue(event.intervention?.message.contains("暫不支援直接提交") ?? false)
         XCTAssertEqual(event.determinePhase(), .waitingForInput)
     }
 

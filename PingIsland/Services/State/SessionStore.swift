@@ -4149,8 +4149,8 @@ actor SessionStore {
 
         let actorName = session.interactionDisplayName
         let title = parsedQuestions.count == 1
-            ? "\(actorName) 的提问"
-            : "\(actorName) 的提问（\(parsedQuestions.count) 个问题）"
+            ? "\(actorName) 的提問"
+            : "\(actorName) 的提問（\(parsedQuestions.count) 個問題）"
         let payload: [String: Any] = ["questions": questions]
         guard let payloadData = try? JSONSerialization.data(withJSONObject: payload, options: [.sortedKeys]),
               let payloadJSON = String(data: payloadData, encoding: .utf8) else {
@@ -4175,7 +4175,7 @@ actor SessionStore {
             id: toolUseId,
             kind: .question,
             title: title,
-            message: "\(actorName) 需要你补充回答，提交后会继续执行当前会话。",
+            message: "\(actorName) 需要你補充回答，提交後會繼續執行目前工作階段。",
             options: [],
             questions: parsedQuestions,
             supportsSessionScope: false,
@@ -4200,14 +4200,14 @@ actor SessionStore {
         guard likelyPromptedQuestionRequest else { return nil }
 
         let title = intent.questionCount == 1
-            ? "Qoder 的提问"
-            : "Qoder 的提问（\(intent.questionCount) 个问题）"
+            ? "Qoder 的提問"
+            : "Qoder 的提問（\(intent.questionCount) 個問題）"
 
         return SessionIntervention(
             id: "qoder-question-intent-\(session.sessionId)",
             kind: .question,
             title: title,
-            message: "Qoder 似乎正在 IDE 内等待你的回答，请回到 Qoder 完成输入。Island 会继续保留提醒，直到会话继续推进。",
+            message: "Qoder 似乎正在 IDE 內等待你的回答，請回到 Qoder 完成輸入。Island 會繼續保留提醒，直到工作階段繼續推進。",
             options: [],
             questions: [],
             supportsSessionScope: false,
@@ -4244,6 +4244,7 @@ actor SessionStore {
             .lowercased()
         guard !normalizedText.isEmpty else { return nil }
 
+        // i18n:simplified-matcher-start — matches incoming (Simplified) agent text; do NOT convert to Traditional.
         if normalizedText.contains("ask_user_question")
             || normalizedText.contains("问您一个问题")
             || normalizedText.contains("问你一个问题")
@@ -4276,12 +4277,14 @@ actor SessionStore {
             || normalizedText.contains("提问工具向你询问") {
             return 1
         }
+        // i18n:simplified-matcher-end
 
         return nil
     }
 
     private func looksLikeQoderQuestionPromptRequest(_ text: String) -> Bool {
         let normalizedText = text.lowercased()
+        // i18n:simplified-matcher-start — matches incoming (Simplified) agent text; do NOT convert to Traditional.
         if normalizedText.contains("问我一个问题")
             || normalizedText.contains("使用工具问我一个问题")
             || normalizedText.contains("ask me a question") {
@@ -4301,6 +4304,7 @@ actor SessionStore {
                 return true
             }
         }
+        // i18n:simplified-matcher-end
 
         return false
     }

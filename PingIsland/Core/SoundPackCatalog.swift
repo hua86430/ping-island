@@ -269,7 +269,7 @@ final class SoundPackCatalog: NSObject, ObservableObject, NSSoundDelegate {
     }
 
     func displayName(for path: String?) -> String {
-        pack(for: path)?.displayName ?? "未选择"
+        pack(for: path)?.displayName ?? "未選擇"
     }
 
     @discardableResult

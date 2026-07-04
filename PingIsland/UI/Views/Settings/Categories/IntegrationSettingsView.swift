@@ -86,17 +86,17 @@ struct IntegrationSettingsView: View {
                 SettingsLineDivider()
 
                 SettingsToggleLine(
-                    title: "空闲时自动保留到终端",
-                    subtitle: "键盘和鼠标静默达到设定时长后临时开启上方策略；恢复活跃后回到手动设置。",
+                    title: "空閒時自動保留到終端機",
+                    subtitle: "鍵盤和滑鼠閒置達到設定時間後暫時開啟上方策略；恢復活躍後回到手動設定。",
                     isOn: $settings.autoRoutePromptsToTerminalWhenIdleEnabled
                 )
                 SettingsLineDivider()
 
                 SettingsInfoLine(
-                    title: "静默时长",
+                    title: "閒置時間",
                     subtitle: settings.idleAutoRoutePromptsToTerminalActive
-                        ? "当前已进入空闲保护，后续新审批和提问会保留在终端。"
-                        : "达到该时长后自动进入空闲保护。"
+                        ? "目前已進入空閒保護，後續新核准和提問會保留在終端機。"
+                        : "達到該時長後自動進入空閒保護。"
                 ) {
                     AutoRoutePromptsIdleDelayPicker(delay: $settings.autoRoutePromptsIdleDelay)
                         .disabled(!settings.autoRoutePromptsToTerminalWhenIdleEnabled)
@@ -1374,7 +1374,7 @@ struct AutoRoutePromptsIdleDelayPicker: View {
             }
         }
         .labelsHidden()
-        .accessibilityLabel(Text(appLocalized: "静默时长"))
+        .accessibilityLabel(Text(appLocalized: "閒置時間"))
         .settingsMenuPicker(width: 132)
     }
 }
