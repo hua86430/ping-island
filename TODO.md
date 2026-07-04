@@ -4,6 +4,9 @@
 
 ## 待處理
 
+- [ ] 懸浮寵物模式 lockout：拖曳離島變寵物後，點不到寵物就開不了設定 — 未修
+  - desc: docked notch 拖曳可 detach 成獨立懸浮寵物（surfaceMode `.floatingPet`）。問題：(1) 拖曳離島這功能沒有任何提示，使用者常誤觸；(2) 變寵物後如果點不到那隻寵物（被別的視窗蓋住、拖到邊角、hit region 太小等），就沒有任何備援入口能開設定或 re-dock — 沒有 menu bar 狀態列選單，設定只能從島/寵物點進去，等於整個鎖死。目前唯一救法是改 UserDefaults `surfaceMode` 回 `notch` 重開，或（點得到時）關掉寵物 / 設定→顯示→展示模式→刈海（`IslandPresentationCoordinator.redockDetached` :123 / `onClose` :227 / `onRedockRequested` :234）。修法方向：加 menu bar 狀態列選單（開設定 / 回到刈海 當逃生口）或全域快捷鍵；並讓「拖回頂部 re-dock」手勢可被發現（例如右鍵寵物選「回到刈海」、或拖曳時提示）。與 notch 視窗框縮減那條分開。
+
 - [x] 全 app 簡體中文清零（繁化總掃）— 完成，scanner 綠、build 綠、guard test 綠
   - desc: guard scanner `scripts/check-simplified-chinese.swift`（ICU Hans-Hant 逐字，key-aware：Simplified Swift literal 若是已解析 zh-Hant key 則放行；matcher 用 `// i18n:simplified-matcher-*` 區塊標記排除，非行號白名單）。實作分三路：(1) zh-Hant.lproj 2 筆殘留值就地改繁（占→佔 行 54/168）+ 補 en-only 缺的 1 key；(2) 40 個 lookup key（`Text(appLocalized:)`/`AppLocalization.format`）補 en + zh-Hant 值、保留簡體 key；(3) 113 個硬編/enum/插值 literal 就地繁化（quote-delimited 全字串比對，避免短詞誤傷長 literal）。matcher 保留簡體並加區塊標記：`SessionState` 4 個進度陣列 + `SessionStore` 2 個 Qoder 提問偵測函式；`SessionStore` 提問卡 DISPLAY 字串照樣繁化。回歸：`PingIslandTests/SimplifiedChineseGuardTests.swift`（zh-Hant 值 ICU 檢查 + scanner 檔存在）；scanner 併入 `scripts/test.sh` 第一步。`SettingsWindowControllerTests`（斷言簡體 key 存在）續綠。spec `docs/superpowers/specs/2026-07-04-full-app-traditional-chinese-sweep-design.md`；plan `docs/superpowers/plans/2026-07-04-full-app-traditional-chinese-sweep.md`。commit 待使用者確認 Jira ticket。
 
