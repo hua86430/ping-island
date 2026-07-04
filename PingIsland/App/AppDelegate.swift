@@ -5,6 +5,7 @@ import SwiftUI
 class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowManager: WindowManager?
     private var screenObserver: ScreenObserver?
+    private var statusBarController: StatusBarController?
     private let launchConfiguration = AppLaunchConfiguration()
     private let startupSessionMonitor = SessionMonitor()
     private let globalShortcutManager = GlobalShortcutManager.shared
@@ -52,6 +53,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         NSApplication.shared.setActivationPolicy(launchConfiguration.activationPolicy)
+
+        // Always-on menu bar escape hatch: the only guaranteed way into Settings when the
+        // floating pet is hard to reach. Skip under tests so no real status item is created.
+        if !launchConfiguration.isRunningTests {
+            statusBarController = StatusBarController()
+        }
 
         let launchFlow = AppLaunchFlow(
             configuration: launchConfiguration,

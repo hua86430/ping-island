@@ -26,6 +26,10 @@ struct DisplaySettingsView: View {
                 }
             }
 
+            SettingsSectionCard(title: "选单栏图标") {
+                MenuBarIconStylePicker(style: $settings.menuBarIconStyle)
+            }
+
             SettingsSectionCard(title: "面板") {
                 IslandSurfaceModeSelector(mode: $settings.surfaceMode)
                 SettingsLineDivider()
@@ -229,6 +233,53 @@ struct FloatingPetSizeModePicker: View {
         .accessibilityLabel(Text(appLocalized: "寵物大小"))
         .settingsMenuPicker(width: 132)
         .help(AppLocalization.string(mode.subtitle))
+    }
+}
+
+struct MenuBarIconStylePicker: View {
+    @Binding var style: MenuBarIconStyle
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(appLocalized: "常驻在选单栏，点一下就能打开设置")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.white.opacity(0.58))
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 10) {
+                ForEach(MenuBarIconStyle.allCases) { candidate in
+                    Button {
+                        style = candidate
+                    } label: {
+                        Image(nsImage: candidate.templateImage(pointSize: 22))
+                            .renderingMode(.template)
+                            .resizable()
+                            .frame(width: 20, height: 20)
+                            .foregroundColor(.white)
+                            .frame(width: 46, height: 46)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(Color.white.opacity(style == candidate ? 0.14 : 0.05))
+                            )
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .strokeBorder(
+                                        style == candidate ? SettingsCategory.display.tint : Color.white.opacity(0.12),
+                                        lineWidth: style == candidate ? 2 : 1
+                                    )
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .help(AppLocalization.string(candidate.titleKey))
+                }
+            }
+
+            Text(appLocalized: style.titleKey)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
+        }
+        .padding(.horizontal, 18)
+        .padding(.vertical, 14)
     }
 }
 

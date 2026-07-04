@@ -12,17 +12,15 @@
 
 ---
 
-## Task 1：Part B 根因執行期診斷（必須最先做）
+## Task 1：Part B 根因執行期診斷（已完成 2026-07-05）
 
-背景：靜態讀碼已證偽核准稿的首要嫌疑——`petButton` 在 `DetachedIslandPanelView.swift:771` 無條件渲染（body `:745-774`），bubble 狀態下拖曳 overlay（`:972-987`）仍在，拖曳鏈全接通（`:1098` NSView → `:1072` bridge → props `:649-651` → `DetachedIslandWindowController.swift:270-271` → `updateFloatingDrag :465` → `setFrameOrigin :450`）。根因需執行期觀測。
+- [x] 在 NSView 層（`DetachedPetInteractionView`）加 log → 看到 `mouseDown=0`
+- [x] 發現量錯層：真正生效的是視窗層 `DetachedIslandWindow.sendEvent`（`DetachedIslandWindowController.swift:15-33`）→ `handlePetMouseDown/Dragged/Up`（`:1065` 起），先攔截消化 leftMouse，NSView 那層拿不到
+- [x] 在視窗層加 log 重測 → `handlePetMouseDown inside=true`、`handlePetMouseDragged` 98 筆 `active=true`、視窗 `setFrameOrigin` 逐格移動、`handlePetMouseUp active=true → endFloatingDrag`；另有 `mouseUp active=false → onPetTap`。拖曳與點擊皆正常
+- [x] 回寫 spec「根因判定（執行期實測）」段
+- [x] 移除所有 PETDRAG 暫時 log（本 task 一併清掉，不留到後面）
 
-- [ ] 在 `DetachedPetInteractionView`（`DetachedIslandPanelView.swift:1127-1158`）的 `mouseDown` / `mouseDragged` / `mouseUp` 加暫時 log（含 translation 與 `hasStartedDrag`）
-- [ ] 在 `DetachedIslandWindowController.updateFloatingDrag`（`:465`）入口與 `setFrameOrigin`（`:450`）呼叫前加暫時 log
-- [ ] Debug build 執行，在四種寵物狀態各重現一次拖曳：compact、hover bubble、notification bubble、pinned bubble；記錄鏈路斷在哪一段
-- [ ] 依斷點逐一驗證 spec 候選表：暫時移除 `:969-971` 的 `.rotationEffect`/`.scaleEffect` 重試；檢查 nonactivating panel first-mouse（`isMovableByWindowBackground=false` `:253`）；檢查 `:465`/`endWindowDrag :497` 內的狀態閘門；檢查 bubble 與 petFrame 重疊時的 hitTest 命中者
-- [ ] 可行時寫一個 red test（純邏輯層，例如把斷掉的閘門條件抽出可測）；若斷點在 AppKit 事件路由層無法單測，記錄手動重現步驟作為 red 基準
-- [ ] 把確認的根因（file:line）回寫 spec「根因判定」段，取代候選表結論
-- 驗證：診斷 log 明確指出斷鏈位置；spec 已更新；暫時 log 標記 TODO 待 Task 4 移除
+結論：現行 HEAD 拖曳與點擊都正常，「拖不動」無法重現。真正問題是設定無明顯入口（右鍵才開、無提示）+ 偶發卡頂（transient，重現不出）。兩者都由 Part A 常駐選單解決。Part B 縮編：Task 4 取消、Task 5 降為驗證。
 
 ## Task 2：StatusBarController 純邏輯 + 測試
 
@@ -35,24 +33,20 @@
 ## Task 3：接線 AppDelegate 與動作
 
 - [ ] `PingIsland/App/AppDelegate.swift` 建立並持有 `StatusBarController`（app 啟動即建立，常駐、無隱藏設定）
-- [ ] 動作接線：開啟設定 → `SettingsWindowController.shared.present()`；展示模式 → 只寫 `AppSettings.surfaceMode`（套用交給 `IslandPresentationCoordinator.swift:154-162` 的 `$surfaceMode` sink → `applySurfaceMode :108` → 需要時 `redockDetached :123`）；檢查更新 → `UpdateManager.checkForUpdates()`（`NotchUserDriver.swift:204`）；離開 → `NSApp.terminate(nil)`
+- [ ] 動作接線：開啟設定 → `SettingsWindowController.shared.present()`；展示模式 → 只寫 `AppSettings.surfaceMode`（套用交給 `IslandPresentationCoordinator.swift:154-162` 的 `$surfaceMode` sink → `applySurfaceMode :108` → 需要時 `redockDetached :123`）；檢查更新 → 訂閱 `UpdateManager.shared.$state` + `checkForUpdates()`,用階段機把結果彈成 `NSAlert` 小視窗(最新 / 發現新版·是否安裝 / 錯誤),不開設定 GUI；離開 → `NSApp.terminate(nil)`
 - 驗證：Build 通過。手動：兩種模式下狀態項可見；開啟設定成功；submenu 切換模式生效且 checkmark 正確（detached 時選停靠瀏海會 re-dock、無重複視窗）；版本行正確；離開可退出
 
-## Task 4：寵物拖曳修復（依 Task 1 結果）
+## Task 4：寵物拖曳修復 —— 取消（Task 1 診斷證實無 bug）
 
-- [ ] 依 Task 1 確認的根因，在對應位置修復（候選落點：`DetachedIslandPanelView.swift:969-987` transform/overlay 順序、`DetachedIslandWindowController.swift:465`/`:497` 閘門、window first-mouse 設定 `:253` 一帶）；只改斷鏈那一段，不重構其他拖曳碼
-- [ ] 若 Task 1 產出 red test，使其轉 green；否則以記錄的手動步驟驗收
-- [ ] 移除 Task 1 的暫時 log
-- [ ] 確認持久化路徑不變：放開後 `clampedPetAnchor`（`:945`）→ `onPetAnchorChanged`（`:491`）→ `endWindowDrag`（`:497`）
-- 驗證：Build + 單元測試通過。手動：四種寵物狀態（compact / hover / notification / pinned bubble）按住本體拖曳皆移動視窗，放開後位置持久化（重啟 app 仍在）；純點擊仍開啟/互動
+現行 HEAD 拖曳與點擊實測正常，無可修之處。暫時 log 已於 Task 1 移除。此 task 不執行。
 
-## Task 5：拖到頂部中央 re-dock
+## Task 5：拖到頂部中央 re-dock —— 降為驗證既有行為（`#219` 已實作）
 
-- [ ] 新增 re-dock 區純函式（`contains(petCenter:screenRect:) -> Bool`；zone = 以 `screenRect.midX` 為中心、寬 240pt、頂緣向下 60pt，見 spec 幾何表；放在 window controller 同層或 `PingIsland/Utilities/`）
-- [ ] `PingIslandTests` 先寫 red test：zone 命中/未命中/邊界值、跨螢幕（不同 `screenRect`）情境
-- [ ] `DetachedIslandWindowController` 拖曳中（`updateFloatingDrag :465` 之後）計算寵物中心是否在 zone，維護「即將停靠」旗標；`endWindowDrag`（`:497`）分流：在 zone 內 → 呼叫 `IslandPresentationCoordinator.redockDetached()`（`:123`），否則走現有 reposition + clamp 持久化
-- [ ] 確認 3pt 門檻語意不變：純點擊永不觸發 re-dock
-- 驗證：單元測試 green。手動：拖入頂部中央放開 → re-dock 成功、docked notch 正常 click-open、無重複視窗；拖到別處放開 → reposition 照舊；點一下 → 照舊互動
+commit `805d4fb`（`#219`）已實作：`isPetAnchorInNotchZone`（`DetachedIslandWindowController.swift:1146`）+ `endFloatingDrag → onRedockRequested`（`:484-490`）→ `IslandPresentationCoordinator.redockDetached()`（`:123`）。
+
+- [ ] 手動驗收：拖寵物到頂部中央放開 → re-dock 回停靠瀏海、docked notch 正常 click-open、無重複視窗
+- [ ] 確認純點擊不觸發 re-dock（3pt 門檻既有）
+- 無程式改動；若驗收發現行為不符再另開 task
 
 ## Task 6：localization + 簡體字 guard
 

@@ -11,6 +11,7 @@ import Foundation
 
 enum AppSettingsDefaultKeys {
     nonisolated static let surfaceMode = "surfaceMode"
+    nonisolated static let menuBarIconStyle = "menuBarIconStyle"
     nonisolated static let notchModuleWidth = "notchModuleWidth"
     nonisolated static let floatingPetAnchor = "floatingPetAnchor"
     nonisolated static let floatingPetSizeMode = "floatingPetSizeMode"
@@ -445,6 +446,7 @@ final class AppSettingsStore: ObservableObject {
         static let closedNotchTrailingContentMode = "closedNotchTrailingContentMode"
         static let previewMascotKind = "previewMascotKind"
         static let surfaceMode = AppSettingsDefaultKeys.surfaceMode
+        static let menuBarIconStyle = AppSettingsDefaultKeys.menuBarIconStyle
         static let floatingPetAnchor = AppSettingsDefaultKeys.floatingPetAnchor
         static let floatingPetSizeMode = AppSettingsDefaultKeys.floatingPetSizeMode
         static let presentationModeOnboardingPending = AppSettingsDefaultKeys.presentationModeOnboardingPending
@@ -830,6 +832,14 @@ final class AppSettingsStore: ObservableObject {
             guard !isBootstrapping else { return }
             defaults.set(surfaceMode.rawValue, forKey: Keys.surfaceMode)
             recordTelemetrySettingChange(key: Keys.surfaceMode, value: surfaceMode.rawValue)
+        }
+    }
+
+    @Published var menuBarIconStyle: MenuBarIconStyle {
+        didSet {
+            guard !isBootstrapping else { return }
+            defaults.set(menuBarIconStyle.rawValue, forKey: Keys.menuBarIconStyle)
+            recordTelemetrySettingChange(key: Keys.menuBarIconStyle, value: menuBarIconStyle.rawValue)
         }
     }
 
@@ -1368,6 +1378,7 @@ final class AppSettingsStore: ObservableObject {
         let closedNotchTrailingContentModeRaw = defaults.string(forKey: Keys.closedNotchTrailingContentMode)
         let previewMascotKindRaw = defaults.string(forKey: Keys.previewMascotKind)
         let surfaceModeRaw = defaults.string(forKey: Keys.surfaceMode)
+        let menuBarIconStyleRaw = defaults.string(forKey: Keys.menuBarIconStyle)
         let floatingPetAnchor = Self.decodeValue(FloatingPetAnchor.self, from: defaults, key: Keys.floatingPetAnchor)
         let floatingPetSizeModeRaw = defaults.string(forKey: Keys.floatingPetSizeMode)
         let mascotOverrideRaw = Self.mascotOverrides(from: defaults, key: Keys.mascotOverrides)
@@ -1548,6 +1559,7 @@ final class AppSettingsStore: ObservableObject {
         ) ?? .sessionCount)
         _previewMascotKind = Published(initialValue: MascotKind(rawValue: previewMascotKindRaw ?? "") ?? .claude)
         _surfaceMode = Published(initialValue: IslandSurfaceMode(rawValue: surfaceModeRaw ?? "") ?? .notch)
+        _menuBarIconStyle = Published(initialValue: MenuBarIconStyle(rawValue: menuBarIconStyleRaw ?? "") ?? .default)
         _floatingPetAnchor = Published(initialValue: floatingPetAnchor)
         _floatingPetSizeMode = Published(
             initialValue: FloatingPetSizeMode(rawValue: floatingPetSizeModeRaw ?? "") ?? .automatic
@@ -1866,6 +1878,11 @@ enum AppSettings {
     static var surfaceMode: IslandSurfaceMode {
         get { shared.surfaceMode }
         set { shared.surfaceMode = newValue }
+    }
+
+    static var menuBarIconStyle: MenuBarIconStyle {
+        get { shared.menuBarIconStyle }
+        set { shared.menuBarIconStyle = newValue }
     }
 
     static var floatingPetAnchor: FloatingPetAnchor? {

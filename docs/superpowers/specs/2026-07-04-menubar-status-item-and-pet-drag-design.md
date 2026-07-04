@@ -33,7 +33,7 @@ PingIsland 是 accessory(輔助程式) 型 app（`NSApplication.setActivationPol
 | 展示模式 | submenu | 見下表 |
 | ──（分隔線） | separator | — |
 | Ping Island v\<CFBundleShortVersionString\> (build \<CFBundleVersion\>) | disabled | 純顯示，`menuWillOpen` 時從 `Bundle.main` 重新讀值 |
-| 檢查更新 | action | 呼叫既有 `UpdateManager.checkForUpdates()`（`PingIsland/Services/Update/NotchUserDriver.swift:204`）；App Store 建置以 `#if APP_STORE`（同 `NotchUserDriver.swift:4` / `:46` 的既有 pattern）隱藏或改用該 lane 的 stub |
+| 檢查更新 | action | 直接彈 `NSAlert` 小視窗回報,不開設定 GUI。訂閱 `UpdateManager.shared.$state`(`.dropFirst()` 略過重播值)、呼叫 `checkForUpdates()`(`PingIsland/Services/Update/NotchUserDriver.swift:204`),用小階段機處理結果:`.upToDate` → 「目前已經是最新版本」[好];`.found` / `.readyToInstall` → 「發現新版本 v%@／是否立即重新啟動並安裝?」[安裝][取消],確認後若已下載完成即 `installAndRelaunch()`,否則等自動下載完成再裝;`.error` → 顯示訊息[好];`.checking/.downloading/.extracting/.installing/.idle` 靜默等待。accessory app 先 `NSApp.activate(ignoringOtherApps:)` 再 `runModal`。App Store 建置以 `#if APP_STORE`（同 `NotchUserDriver.swift:4` / `:46` 的既有 pattern）整個隱藏此項 |
 | ──（分隔線） | separator | — |
 | 離開 Ping Island | action | `NSApp.terminate(nil)` |
 
@@ -57,7 +57,7 @@ flowchart TD
     C -->|展示模式 > 獨立懸浮寵物| F["AppSettings.surfaceMode = .floatingPet"]
     E --> G["IslandPresentationCoordinator<br/>$surfaceMode sink (:154-162)<br/>→ applySurfaceMode (:108)<br/>→ 必要時 redockDetached() (:123)"]
     F --> G
-    C -->|檢查更新| H["UpdateManager.checkForUpdates()<br/>APP_STORE 建置隱藏/stub"]
+    C -->|檢查更新| H["訂閱 UpdateManager.$state<br/>→ checkForUpdates()<br/>→ NSAlert 回報 最新/發現新版·安裝/錯誤<br/>APP_STORE 建置隱藏"]
     C -->|離開 Ping Island| I["NSApp.terminate(nil)"]
 ```
 
@@ -82,28 +82,30 @@ flowchart TD
 
 ## Part B：寵物拖曳修復 + 拖到頂部中央重新停靠
 
-### 既有拖曳鏈（靜態確認完整）
+### 拖曳鏈實際上是兩層，真正生效的是視窗層
 
-以下鏈路已逐段讀碼確認全部接通：
+診斷發現拖曳有兩條平行實作，之前的靜態讀碼只看到 NSView 那條（其實是 dead path）：
 
-1. `DetachedPetInteractionView`（NSView，`DetachedIslandPanelView.swift:1098`）：`mouseDown`/`mouseDragged`/`mouseUp`（`:1127-1158`），3pt 門檻（`:1104`, `:1141`），`hitTest` 回傳 self（`:1123-1125`），`acceptsFirstMouse` 為 true（`:1119-1121`）。
-2. 經 `DetachedPetInteractionBridge`（`:1072`）以最上層 `.overlay` 安裝（`:972-987`）。
-3. callback props `onPetDragStarted`/`onPetDragChanged`/`onPetDragEnded`（`:649-651`）→ `DetachedIslandWindowController.onPetDragChanged`（`DetachedIslandWindowController.swift:270-271`）→ `updateFloatingDrag(translation:)`（`:465`）→ `setFrameOrigin`（`:450`）。
+1. **NSView 層（實際 dead）**：`DetachedPetInteractionView`（`DetachedIslandPanelView.swift:1098`）以 `.overlay` 安裝（`:972-987`），有 `mouseDown`/`mouseDragged`/`mouseUp`。但它幾乎收不到 `mouseDown`，因為視窗層先攔截。
+2. **視窗層（實際 live）**：`DetachedIslandWindow.sendEvent`（`DetachedIslandWindowController.swift:15-33`）攔截所有 leftMouse 事件，先問 `petMouseDownHandler` / `petMouseDraggedHandler` / `petMouseUpHandler`（`:288-296` 綁定）→ `handlePetMouseDown/Dragged/Up`（`:1065` 起）。命中寵物（`isPointInsidePet` → `petInteractionFrame`）就 `return true` 消化事件，永不 `super.sendEvent`，所以 NSView 那層拿不到 mouseDown。
+3. 視窗層拖曳流向：`handlePetMouseDragged` 過 3pt 門檻 → `beginFloatingDrag`（`:457`）→ `updateFloatingDrag`（`:467`）→ `window.setFrameOrigin`；`handlePetMouseUp` 依 `isPetDragActive` 分流 `endFloatingDrag`（`:484`）或 `onPetTap`。
 
-### 根因判定
+### 根因判定（執行期實測）
 
-**核准稿的首要嫌疑（petButton 只在 compact 狀態渲染、bubble 狀態沒有拖曳 handler）經讀碼證偽**：`DetachedIslandPanelView.body`（`DetachedIslandPanelView.swift:745-774`）中 `petButton` 在 `:771` 無條件渲染，與 `bubbleView`（`:848`，hover / notification / pinned bubble）並存於同一 ZStack——寵物本體在任何 bubble 狀態下都掛著拖曳 overlay。因此「bubble 狀態缺 handler」不是根因。
+**核准稿的「寵物拖不動」在現行 HEAD 無法重現。以視窗層 instrumentation 實測(2026-07-05)確認拖曳與點擊都正常：**
 
-**結論：靜態讀碼無法定根因，需要執行期觀測釐清**（此為依 `:771` 證據所下的判斷，非臆測性填補）。剩餘候選，依可疑度排序：
+- `handlePetMouseDown` `inside=true`、`handlePetMouseDragged` 98 筆 `active=true`、`window.setFrameOrigin` 逐格移動視窗、`handlePetMouseUp active=true → endFloatingDrag` — 拖曳完整生效。
+- 另有兩次 `mouseUp active=false insideOnUp=true → onPetTap` — 點擊生效（開通知泡泡）。
+- 第一輪把 log 加在 NSView 層看到 `mouseDown=0`，是因為量錯層(視窗層先消化),不是 bug。
 
-| 候選 | 位置 | 驗證方式 |
-| --- | --- | --- |
-| `.rotationEffect` / `.scaleEffect` 在 `.overlay` 之前套用，拖曳中 transform(變形) 造成命中座標偏移或事件中斷 | `DetachedIslandPanelView.swift:969-971` vs `:972-987` | 暫時移除 transform 後重試拖曳 |
-| nonactivating panel + first-mouse 互動（視窗未啟用時首次 mouseDown 的事件路由；`isMovableByWindowBackground = false` 在 `DetachedIslandWindowController.swift:253`） | window controller | 記錄 `mouseDown`/`mouseDragged` 是否真的抵達 NSView |
-| `updateFloatingDrag`（`:465`）/ `endWindowDrag`（`:497`）內的狀態閘門在特定 bubble / hover 狀態下擋掉位移 | `DetachedIslandWindowController.swift` | 在 `:465` 入口與 `setFrameOrigin`（`:450`）前打 log 比對 |
-| bubble 展開時 bubble 視圖與 petFrame 重疊，hit-testing 被 bubble 搶走 | `DetachedIslandPanelView.swift:745-774` layout | 各 bubble 狀態下記錄 hitTest 命中者 |
+**先前候選表全部作廢**：transform 順序、first-mouse、狀態閘門、bubble 搶 hit-test 均非根因，因為視窗層根本不經過那些路徑。
 
-Plan 的 Task 1 即為此執行期診斷步驟；後續修復 task 以診斷結果為準。
+真正的問題有二，都不是「拖曳鏈壞掉」：
+
+1. **設定無明顯入口**：左鍵開通知泡泡、右鍵才開設定（`handlePetSecondaryClick → SettingsWindowController.present()`），右鍵完全沒有提示。這是 lockout 的主因，由 Part A 常駐選單解決。
+2. **偶發卡頂**：使用者回報「卡在 top menu 上面」（寵物拖到螢幕頂端系統選單列一帶後短暫點不到/拖不動），為 transient，實測期間無法穩定重現。Part A 常駐選單讓此情況不再是死路（永遠能開設定切回停靠瀏海）。若日後能穩定重現再獨立追。
+
+**Part B 因此縮編**：無拖曳修復可做（Task 4 取消）；拖到頂部中央 re-dock 已於 `#219`（commit `805d4fb`）實作(`isPetAnchorInNotchZone` + `endFloatingDrag → onRedockRequested`)，Task 5 降為驗證既有行為。核心交付集中在 Part A。
 
 ### 行為契約（behavior contract）
 
@@ -147,13 +149,12 @@ stateDiagram-v2
 | --- | --- |
 | `PingIsland/App/StatusBarController.swift`（新增） | NSStatusItem + NSMenu + NSMenuDelegate；選單建構抽成純邏輯以便測試 |
 | `PingIsland/App/AppDelegate.swift` | 持有並初始化 `StatusBarController` |
-| `PingIsland/UI/Views/DetachedIslandPanelView.swift` | 依 Task 1 診斷結果修復拖曳（候選：`:969-987` transform/overlay 順序） |
-| `PingIsland/UI/Window/DetachedIslandWindowController.swift` | 拖曳中計算 re-dock 區命中；`endWindowDrag`（`:497`）分流 redock vs reposition |
-| `PingIsland/App/IslandPresentationCoordinator.swift` | 曝露/重用 `redockDetached()`（`:123`）給拖放 re-dock 呼叫 |
-| Re-dock 區純函式（新增，跟隨 window controller 同層或 Utilities） | zone 幾何 + 單元測試 |
+| `PingIsland/App/IslandPresentationCoordinator.swift` | 提供選單「展示模式」切換入口（改寫 `AppSettings.surfaceMode` 即走既有 `$surfaceMode` sink，無需新增方法） |
 | `PingIsland/Resources/zh-Hant.lproj/Localizable.strings`、`en.lproj/Localizable.strings` | Part A 新增字串 |
-| `PingIslandTests/`（root Xcode 測試 target） | 選單建構、re-dock zone、clamp 相關純邏輯測試 |
+| `PingIslandTests/`（root Xcode 測試 target） | 選單建構純邏輯測試（項目順序、checkmark 跟隨 surfaceMode、版本字串、App Store 分支不含檢查更新） |
 | `AGENTS.md` | 補 StatusBarController 入口與 change-routing 條目 |
+
+Part B 診斷後不再有程式改動：拖曳修復取消（無 bug），re-dock 已於 `#219` 實作，僅驗證。
 
 ### 邊界條件
 

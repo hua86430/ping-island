@@ -118,6 +118,8 @@ flowchart TB
 **檔案：**
 - `PingIsland/App/PingIslandApp.swift`
 - `PingIsland/App/AppDelegate.swift`
+- `PingIsland/App/StatusBarController.swift`
+- `PingIsland/App/MenuBarIconStyle.swift`
 - `PingIsland/App/AppLaunchConfiguration.swift`
 - `PingIsland/App/IslandPresentationCoordinator.swift`
 - `PingIsland/App/WindowManager.swift`
@@ -130,7 +132,9 @@ flowchart TB
 **關鍵型別與進入點：**
 
 - `PingIslandApp`（`@main`）→ SwiftUI `App`。只做兩件事：用 `@NSApplicationDelegateAdaptor` 掛上 `AppDelegate`，並宣告一個 SwiftUI `Settings` scene（承載 `SettingsWindowView`，注入 `settings.locale`）。真正的 runtime 全在 `AppDelegate`。
-- `AppDelegate`（`@MainActor`）→ 生命週期中樞。持有 `WindowManager`、`ScreenObserver`、`AppLaunchConfiguration`、一個啟動期 `SessionMonitor`、`GlobalShortcutManager.shared`；用兩個 bool 旗標（`shouldPresentSettingsAfterOnboarding`、`shouldRunHookWalkthroughAfterOnboarding`）串接 onboarding 後續動作。
+- `AppDelegate`（`@MainActor`）→ 生命週期中樞。持有 `WindowManager`、`ScreenObserver`、`StatusBarController`、`AppLaunchConfiguration`、一個啟動期 `SessionMonitor`、`GlobalShortcutManager.shared`；用兩個 bool 旗標（`shouldPresentSettingsAfterOnboarding`、`shouldRunHookWalkthroughAfterOnboarding`）串接 onboarding 後續動作。啟動時（非測試）建立常駐 `StatusBarController`。
+- `StatusBarController`（`@MainActor`, `final`）→ 常駐選單列狀態項（`NSStatusItem` + `NSMenu`），accessory app 進設定的逃生口。選單版面由純函式 `StatusBarMenuBuilder.menu(...)` 產生（開啟設定 / 展示模式 submenu 附 checkmark / 版本資訊行 / 檢查更新（App Store 建置隱藏）/ 離開），只寫 `AppSettings.surfaceMode` 交由 coordinator 的 `$surfaceMode` sink 套用；`menuWillOpen` 重建選單刷新 checkmark 與版本行。檢查更新用階段機訂閱 `UpdateManager.$state` + `NSAlert` 小視窗回報(最新 / 發現新版·安裝 / 錯誤),不開設定 GUI。狀態項圖示由 `AppSettings.menuBarIconStyle` 決定,`$menuBarIconStyle` sink 即時換圖。純建構器與 `StatusMenuItem` / `StatusMenuAction` 值型別可單測（`StatusBarMenuBuilderTests`）。
+- `MenuBarIconStyle`（`String` enum, `CaseIterable`）→ 可切換的選單列圖示樣式(瀏海三點 / 實心島鏤空 / 程式碼火花 / 指令泡泡 / 游標火花)。每個 case 對應 `Assets.xcassets` 內一個 template imageset(單色向量,`preserves-vector-representation` + template 染色,原始 SVG 收在 `design/menubar-icons/`),`templateImage(pointSize:)` 載入並複製快取影像設成 template。選擇持久化在 `AppSettings.menuBarIconStyle`,Settings「顯示 > 選單列圖示」的 `MenuBarIconStylePicker` 提供預覽切換。可單測（`MenuBarIconStyleTests`)。
 - `AppLaunchConfiguration`（`struct`, `Equatable`）→ 純環境變數解析：把 XCTest / UI test / 環境旗標映射成「這次啟動該不該裝整合、建視窗、觀察螢幕、強制單實例、開設定視窗」以及 activation policy。無副作用，可測。
 - `AppLaunchFlow`（`struct`, `Equatable`）→ 純決策：吃 `AppLaunchConfiguration` + `presentationModeOnboardingPending`，算出五個啟動旗標（是否立即監控、是否跑 surface-mode onboarding、是否建初始 Island 視窗、是否立即 / onboarding 後開設定視窗）。
 - `NotchDetachmentHintExperience`（`enum`-風格 `struct`）→ 一次性版本升級偵測，決定升級後是否標記 detach 提示與浮動寵物提示待顯示。
@@ -3362,3 +3366,5 @@ CLAUDE.md 指出這裡是「最快做 logic-level 單測」的地方；bridge-fo
 | 175 | `Prototype/Sources/IslandShared/BridgeRuntimeConfig.swift` | §15 Prototype / IslandBridge |
 | 176 | `Prototype/Sources/IslandShared/HookPayloadMapper.swift` | §15 Prototype / IslandBridge |
 | 177 | `Prototype/Sources/IslandShared/Models.swift` | §15 Prototype / IslandBridge |
+| 178 | `PingIsland/App/StatusBarController.swift` | §01 App 與呈現編排 |
+| 179 | `PingIsland/App/MenuBarIconStyle.swift` | §01 App 與呈現編排 |

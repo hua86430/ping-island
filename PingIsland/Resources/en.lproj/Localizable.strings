@@ -38,6 +38,8 @@
 "hover 展开的预览面板会在鼠标离开后自动关闭" = "Automatically close the hover preview panel when the mouse leaves";
 "应用" = "App";
 "退出应用" = "Quit app";
+"退出 Ping Island" = "Quit Ping Island";
+"打开设置" = "Open Settings";
 "立即关闭 Island" = "Quit Island immediately";
 
 "当前显示器" = "Current display";
@@ -69,6 +71,13 @@
 "刘海屏方式" = "Top Island";
 "固定在屏幕顶部中央，沿用 Island 刘海/胶囊体验" = "Keep Island centered at the top of the screen and preserve the notch/capsule experience.";
 "独立悬浮宠物" = "Floating pet";
+"选单栏图标" = "Menu bar icon";
+"常驻在选单栏，点一下就能打开设置" = "Always in the menu bar; click it to open Settings";
+"刘海胶囊三点" = "Notch capsule · dots";
+"实心岛三点镂空" = "Solid island · hollow dots";
+"代码火花" = "Code </> · spark";
+"指令气泡" = "Command bubble";
+"光标火花" = "Caret · spark";
 "默认贴近当前激活窗口右下角，可拖动并记住位置" = "Place the floating pet near the bottom-right corner of the active window by default, with drag-to-move and remembered placement.";
 "默认宠物形象" = "Default mascot";
 "设置展示模式和刘海示意图里使用的默认宠物。当前只影响设置内示意图。" = "Choose the mascot used in the presentation-mode and notch previews. This currently only affects Settings previews.";
@@ -232,6 +241,7 @@
 "自动更新已关闭，可随时手动检查" = "Automatic updates are off. You can check manually at any time.";
 "启动时和空闲时自动检查、下载并安装更新" = "Automatically check, download, and install updates on launch and while idle";
 "当前已经是最新版本" = "You're already on the latest version";
+"是否立即重启并安装？" = "Restart and install now?";
 "正在连接更新源" = "Connecting to the update feed";
 "发现新版本 v%@" = "New version found: v%@";
 "下载进度 %lld%%" = "Download progress %lld%%";
