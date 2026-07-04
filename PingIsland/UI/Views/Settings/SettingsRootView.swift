@@ -162,9 +162,15 @@ struct SettingsRootView: View {
 
     private func shouldShowLoading(for category: SettingsCategory) -> Bool {
         switch category {
-        case .display, .sound, .integration:
+        // analytics + mascot build heavy trees (analytics: ~180-cell heatmap + per-model
+        // charts, double-built on snapshot load; mascot: animated pet previews). Without the
+        // placeholder their whole tree builds synchronously inside the sidebar-selection
+        // transaction, stalling the click frame for ~0.5-1s. Route them through the existing
+        // 80ms loading placeholder so the click paints instantly and the heavy build happens
+        // off the selection transaction.
+        case .display, .sound, .integration, .analytics, .mascot:
             return true
-        case .general, .shortcuts, .mascot, .analytics, .remote, .labs, .about:
+        case .general, .shortcuts, .remote, .labs, .about:
             return false
         }
     }
