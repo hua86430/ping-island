@@ -2,6 +2,14 @@
 
 This file is a routing layer for coding agents working in this repo. Keep it short. Put long-lived detail in nearby code, focused docs, or tests.
 
+## Living Architecture Doc (read and update first)
+
+- `ARCHITECTURE.md` at the repo root is the full internal architecture map: every subsystem's responsibility, key types, core flows (mermaid), and the cross-cutting end-to-end data flows. Read it first for the big picture; this file only routes.
+- It is a LIVING doc with a file-level 100% coverage contract: every production Swift source file (`PingIsland/` + `Prototype/Sources/`, 177 files; `Prototype/Tests/` excluded) must appear in a section AND in the "附錄 B 檔案覆蓋矩陣" table.
+- ANY change to code or architecture MUST update `ARCHITECTURE.md` in the SAME change: touched file → update its section text and diagrams; new file → add a matrix row and fold it into a section; deleted file → remove its matrix row; changed cross-subsystem flow → update the "跨切面流程索引" plus the affected section diagrams.
+- Granularity is deliberately file/type/flow level, NOT line-by-line if/else. Flows use mermaid; rules and data contracts use prose + tables. Keep it that way so the doc stays maintainable.
+- Before committing, run `./scripts/check-arch-coverage.sh` — it lists any source file missing from `ARCHITECTURE.md` and exits 1 (CI-gate-able).
+
 ## Mission
 
 - `PingIsland` is a macOS menu bar app that surfaces Dynamic Island-style status for Claude Code, Codex, Gemini CLI, Hermes Agent, Qwen Code, Kimi CLI, and compatible hook-driven agent sessions.
