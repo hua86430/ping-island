@@ -71,42 +71,59 @@ class NotchViewController: NSViewController {
             }
         )
 
-        // Calculate the hit-test rect based on panel state
+        // Calculate the hit-test rect based on panel state. Read the LIVE window
+        // height (the window frame now scales with status) instead of the fixed
+        // geometry.windowHeight, so hit-testing tracks whatever frame is current.
         hostingView.hitTestRect = { [weak self] in
             guard let self = self else { return .zero }
             let vm = self.viewModel
             let geometry = vm.geometry
-
-            // Window coordinates: origin at bottom-left, Y increases upward
-            // The window is positioned at top of screen, so panel is at top of window
-            let windowHeight = geometry.windowHeight
-
-            switch vm.status {
-            case .opened:
-                let panelSize = vm.openedSize
-                // Panel is centered horizontally, anchored to top
-                let panelWidth = panelSize.width + 52  // Account for corner radius padding
-                let panelHeight = panelSize.height
-                let screenWidth = geometry.screenRect.width
-                return CGRect(
-                    x: (screenWidth - panelWidth) / 2,
-                    y: windowHeight - panelHeight,
-                    width: panelWidth,
-                    height: panelHeight
-                )
-            case .closed, .popping:
-                let closedSize = vm.closedSize
-                let screenWidth = geometry.screenRect.width
-                // Add some padding for easier interaction
-                return CGRect(
-                    x: (screenWidth - closedSize.width) / 2 - 10,
-                    y: windowHeight - closedSize.height - 5,
-                    width: closedSize.width + 20,
-                    height: closedSize.height + 10
-                )
-            }
+            let windowFrame = self.view.window?.frame
+            let windowWidth = windowFrame?.width ?? geometry.screenRect.width
+            let windowHeight = windowFrame?.height ?? geometry.windowHeight
+            return Self.panelHitRect(
+                status: vm.status,
+                openedSize: vm.openedSize,
+                closedSize: vm.closedSize,
+                windowWidth: windowWidth,
+                windowHeight: windowHeight
+            )
         }
 
         self.view = hostingView
+    }
+
+    /// Panel hit rect in window coordinates (origin bottom-left, panel pinned to the
+    /// window top). Pure so the height source can be unit-tested. `windowHeight` is
+    /// the live window height; `.opened` fills a centered panel, `.closed`/`.popping`
+    /// a padded pill.
+    static func panelHitRect(
+        status: NotchStatus,
+        openedSize: CGSize,
+        closedSize: CGSize,
+        windowWidth: CGFloat,
+        windowHeight: CGFloat
+    ) -> CGRect {
+        // Panels are centered horizontally within the WINDOW (the window is itself
+        // centered on screen), so center on windowWidth, not screen width.
+        switch status {
+        case .opened:
+            let panelWidth = openedSize.width + 52  // Account for corner radius padding
+            let panelHeight = openedSize.height
+            return CGRect(
+                x: (windowWidth - panelWidth) / 2,
+                y: windowHeight - panelHeight,
+                width: panelWidth,
+                height: panelHeight
+            )
+        case .closed, .popping:
+            // Add some padding for easier interaction
+            return CGRect(
+                x: (windowWidth - closedSize.width) / 2 - 10,
+                y: windowHeight - closedSize.height - 5,
+                width: closedSize.width + 20,
+                height: closedSize.height + 10
+            )
+        }
     }
 }

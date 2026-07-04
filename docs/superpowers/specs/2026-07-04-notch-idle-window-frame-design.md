@@ -13,12 +13,14 @@
 
 ## 目標與範圍
 
+> 修訂（2026-07-04，實機檢視後）：原本 `.closed` 用「滿螢幕寬」窄條是為了不動 hitTest 的水平置中數學。改成**置中窄框**——視窗寬固定為 `panelWindowWidth`（≈ 最大 docked 展開面板寬 600 + hit padding，取 700），置中在螢幕中央；`.opened`/`.popping` 同樣只有 700 寬（展開面板最寬 `min(screenWidth-64, 600)`，放得下），不再滿螢幕寬。`.closed` 高度 = `closedHeight` + 小 slack（24，動態跟著 closedHeight）。擷取框因此在寬與高兩個方向都縮到面板本身大小。
+
 做：
 
-1. 新增 `closedWindowFrame(screenFrame:closedHeight:)`（`dockedWindowFrame` 的 companion）：滿寬、貼頂、高度 = `closedHeight` + 固定 slack 常數。
-2. `updateWindowPresentation` 依 `viewModel.status` 選目標框：`.closed` → 窄條；`.popping` / `.opened` → 750 全畫布。開啟前先長大、關閉後延遲縮小（時序見下方流程圖）。
-3. `NotchViewController.hitTestRect` 改讀即時視窗高度（`view.window?.frame.height`，nil 時 fallback `geometry.windowHeight`），讓 hit-test 跟著當前框走。
-4. `moveToScreen` 依「當前 status」重算框（窄條 vs 全畫布），不再一律套全畫布。
+1. 新增 `panelWindowWidth`（常數 700）；`dockedWindowFrame` 與 `closedWindowFrame` 都改成**置中**（`x = screenFrame.midX − panelWindowWidth/2`、`width = panelWindowWidth`）。`closedWindowFrame(screenFrame:closedHeight:)` 高度 = `closedHeight` + `closedFrameSlack`(24)。
+2. `updateWindowPresentation` 依 `viewModel.status` 選目標框：`.closed` → 置中窄框；`.popping` / `.opened` → 置中全高框（700 × 750）。開啟前先長大、關閉後延遲縮小（時序見下方流程圖）。
+3. `NotchViewController.panelHitRect` 的水平置中改用**視窗寬**（closure 傳 `view.window?.frame.width`），不再用 `geometry.screenRect.width`；高度來源改讀即時視窗高（`view.window?.frame.height`，nil 時 fallback `geometry.windowHeight` / `screenRect.width`），讓 hit-test 跟著置中窄框走。
+4. `moveToScreen` 依「當前 status」重算框（置中窄框 vs 置中全高框）。
 
 不做（明確排除，無 scope creep）：
 
