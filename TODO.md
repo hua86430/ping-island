@@ -4,8 +4,8 @@
 
 ## 待處理
 
-- [ ] 懸浮寵物模式 lockout：拖曳離島變寵物後，點不到寵物就開不了設定 — 未修
-  - desc: docked notch 拖曳可 detach 成獨立懸浮寵物（surfaceMode `.floatingPet`）。問題：(1) 拖曳離島這功能沒有任何提示，使用者常誤觸；(2) 變寵物後如果點不到那隻寵物（被別的視窗蓋住、拖到邊角、hit region 太小等），就沒有任何備援入口能開設定或 re-dock — 沒有 menu bar 狀態列選單，設定只能從島/寵物點進去，等於整個鎖死。目前唯一救法是改 UserDefaults `surfaceMode` 回 `notch` 重開，或（點得到時）關掉寵物 / 設定→顯示→展示模式→刈海（`IslandPresentationCoordinator.redockDetached` :123 / `onClose` :227 / `onRedockRequested` :234）。修法方向：加 menu bar 狀態列選單（開設定 / 回到刈海 當逃生口）或全域快捷鍵；並讓「拖回頂部 re-dock」手勢可被發現（例如右鍵寵物選「回到刈海」、或拖曳時提示）。與 notch 視窗框縮減那條分開。
+- [x] 懸浮寵物模式 lockout：拖曳離島變寵物後點不到寵物就開不了設定 — 逃生口已於 0.26.0 補上
+  - desc: docked notch 拖曳可 detach 成獨立懸浮寵物（surfaceMode `.floatingPet`）。原本鎖死：變寵物後若點不到那隻寵物（被別視窗蓋住、拖到邊角、hit region 太小），沒有備援入口能開設定或 re-dock。0.26.0 加了常駐 menu bar 狀態列選單（`StatusBarController`；`AppDelegate` :59 無條件建立，只有測試跳過）當逃生口：開設定、「展示模式」子選單直接切回刈海（`.notch`）/ 懸浮寵物、退出。lockout 解除。殘留（非 lockout，UX polish、可另開小項）：「拖回頂部 re-dock」手勢仍不好發現，例如右鍵寵物選「回到刈海」或拖曳時提示。
 
 - [x] 全 app 簡體中文清零（繁化總掃）— 完成，scanner 綠、build 綠、guard test 綠
   - desc: guard scanner `scripts/check-simplified-chinese.swift`（ICU Hans-Hant 逐字，key-aware：Simplified Swift literal 若是已解析 zh-Hant key 則放行；matcher 用 `// i18n:simplified-matcher-*` 區塊標記排除，非行號白名單）。實作分三路：(1) zh-Hant.lproj 2 筆殘留值就地改繁（占→佔 行 54/168）+ 補 en-only 缺的 1 key；(2) 40 個 lookup key（`Text(appLocalized:)`/`AppLocalization.format`）補 en + zh-Hant 值、保留簡體 key；(3) 113 個硬編/enum/插值 literal 就地繁化（quote-delimited 全字串比對，避免短詞誤傷長 literal）。matcher 保留簡體並加區塊標記：`SessionState` 4 個進度陣列 + `SessionStore` 2 個 Qoder 提問偵測函式；`SessionStore` 提問卡 DISPLAY 字串照樣繁化。回歸：`PingIslandTests/SimplifiedChineseGuardTests.swift`（zh-Hant 值 ICU 檢查 + scanner 檔存在）；scanner 併入 `scripts/test.sh` 第一步。`SettingsWindowControllerTests`（斷言簡體 key 存在）續綠。spec `docs/superpowers/specs/2026-07-04-full-app-traditional-chinese-sweep-design.md`；plan `docs/superpowers/plans/2026-07-04-full-app-traditional-chinese-sweep.md`。commit 待使用者確認 Jira ticket。
@@ -26,8 +26,8 @@
   - desc: (1) `HoverSessionCard` 對 attention/dashboard 卡傳 `opensOnTap:false`，唯讀 reminder 卡的 tap 從不觸發 activate → 對 terminalRoutedReminder bypass 該 guard（commit c3fb37c）。驗：你 04:17 在含此修正的 build 上真實點擊，log 出現 `SessionLauncher Activate request ... cc-workspace`（修正前 0 筆）。(2) Ghostty focus AppleScript 只 `focus <terminal>`（切 tab）沒 `activate`（抬 app）→ tell block 開頭加 `activate`。驗：實跑 AppleScript，frontmost Finder→ghostty。卡渲染從 image 20 確認。限制：受工具限（無 cliclick、notch 未自動彈合成 session）沒能單獨跑「一次點擊→抬前」端到端，兩段各自驗。「有時沒卡」= 問題已解決（transcript 有 tool_result）為正確行為，非 bug。
 
 
-- [ ] 完成卡 presenter 在本機從不 present — 既有謎，待診斷
-  - desc: `autoOpenCompletionPanel` 開、無 mute、無 smartSuppression，三次真實回覆完成仍無完成卡（feed banner 已補位使用者需求）。0.25.0 前 live 實測發現，非該功能 diff 造成。證據 `.superpowers/sdd/feed-autoopen-selftest-report.md`。
+- [x] 完成卡 presenter 在本機從不 present — 0.26.2 修好（根因是完成偵測時序競態）
+  - desc: 根因不在 presenter，在完成判斷 `SessionCompletionStateEvaluator.isCompletedReadySession`。Claude 的 assistant 回覆在 `Stop→waitingForInput` 之後約 100ms+ 才從 transcript 解析進 chatItems，idle 期間沒有其他 parse 觸發，加上 claude-mem 在回覆後注入 trailing 工具活動，使「最後一個 chat item 是 assistant」永遠不成立 → `completedReady` 從沒到 1 → 完成音與完成卡 presenter 都不觸發。0.26.2 改用 `Stop` 權威訊號：`SessionState.assistantTurnCompleted`（`SessionStore.processHookEvent` 設、`isCompletedReadySession` 認）。實機驗證（CoreAudio process tap，log 05:15:09）：completedReady 在 Stop 當下 0→1、`notch OPEN reason=notification`、完成音有實際音訊輸出。完成 panel 本身共用同一 gate、應一併 present；建議實際看一次確認。commit 4e3571a、release 0.26.2。
 
 - [x] cursor-follow：島跨螢幕跟隨游標、消除搬移延遲 — 實作完成，執行期實測核心行為通過
   - desc: spec `docs/superpowers/specs/2026-07-01-notch-follow-cursor-design.md`；plan `docs/superpowers/plans/2026-07-01-notch-follow-cursor.md`（commit d85e3fc）。實作 commits 7f7fc05（`NotchWindowController.moveToScreen` + frame helper，2 test）、7c6dd26（純 `NotchScreenMigrationDecider`，7 test）、3ca6de8（`WindowManager` 訂閱 `EventMonitors.mouseLocation`、走 `updateScreen`→`moveToScreen` cheap path、focus 遷移改用 `migrate`；AGENTS.md）。全 `PingIslandTests` 綠。執行期實測（2 外接螢幕、合成 mouseMoved 事件驅動 fresh Debug build）：0→1 遷移 PASS（notch x=0→2560）、dwell gate 不即時遷移 PASS、cheap path 無 rebuild（migrate() 不碰 setupNotchWindow）。未執行期驗：specific-screen 不遷移（僅 decider guard 單元測試）、內建↔外接 notch 高度（測時 clamshell 無 active 內建）。
