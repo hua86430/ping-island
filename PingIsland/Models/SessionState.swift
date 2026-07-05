@@ -74,6 +74,16 @@ struct SessionState: Equatable, Identifiable, Sendable {
     /// Current phase in the session lifecycle
     var phase: SessionPhase
 
+    /// True once the agent has finished a turn (a `Stop` hook landed the session
+    /// at `.waitingForInput` with no pending intervention) and is now waiting on
+    /// the user. This is the authoritative "agent stopped, your turn" completion
+    /// signal. It exists because for Claude the assistant reply is parsed out of
+    /// the transcript ~100ms+ AFTER the synchronous Stop→waitingForInput phase
+    /// flip, so completion detection cannot rely on the last chat item being an
+    /// assistant reply at the moment the turn ends. Cleared whenever the session
+    /// resumes active work.
+    var assistantTurnCompleted: Bool
+
     // MARK: - Chat History
 
     /// All chat items for this session (replaces ChatHistoryManager.histories)
@@ -147,6 +157,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         isInTmux: Bool = false,
         autoApprovePermissions: Bool = false,
         phase: SessionPhase = .idle,
+        assistantTurnCompleted: Bool = false,
         chatItems: [ChatHistoryItem] = [],
         toolTracker: ToolTracker = ToolTracker(),
         completedErrorToolIDs: Set<String> = [],
@@ -185,6 +196,7 @@ struct SessionState: Equatable, Identifiable, Sendable {
         self.isInTmux = isInTmux
         self.autoApprovePermissions = autoApprovePermissions
         self.phase = phase
+        self.assistantTurnCompleted = assistantTurnCompleted
         self.chatItems = chatItems
         self.toolTracker = toolTracker
         self.completedErrorToolIDs = completedErrorToolIDs

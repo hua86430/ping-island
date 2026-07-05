@@ -39,6 +39,52 @@ final class SessionCompletionStateEvaluatorTests: XCTestCase {
         XCTAssertFalse(SessionCompletionStateEvaluator.isCompletedReadySession(session))
     }
 
+    func testCompletedReadySessionHonorsStopTurnCompletionDespiteMissingAssistantTail() {
+        // Claude's assistant reply is parsed out of the transcript ~100ms+ after the
+        // synchronous Stop→waitingForInput flip, so at the completion moment chatItems
+        // still ends with the user prompt (or a trailing background observation tool).
+        // The Stop-driven `assistantTurnCompleted` flag must make the session
+        // completed-ready even though hasCompletedAssistantReply() is false.
+        let session = SessionState(
+            sessionId: "stop-flag-no-tail",
+            cwd: "/tmp/project",
+            phase: .waitingForInput,
+            assistantTurnCompleted: true,
+            chatItems: [
+                ChatHistoryItem(id: "1", type: .user("hello"), timestamp: Date(timeIntervalSince1970: 1))
+            ]
+        )
+
+        XCTAssertFalse(SessionCompletionStateEvaluator.hasCompletedAssistantReply(for: session))
+        XCTAssertTrue(SessionCompletionStateEvaluator.isCompletedReadySession(session))
+    }
+
+    func testAssistantTurnCompletedStillRespectsInterventionAndPhaseGuards() {
+        let processing = SessionState(
+            sessionId: "stop-flag-processing",
+            cwd: "/tmp/project",
+            phase: .processing,
+            assistantTurnCompleted: true
+        )
+        // Flag set but the session is actively working again -> not completed-ready.
+        XCTAssertFalse(SessionCompletionStateEvaluator.isCompletedReadySession(processing))
+
+        var withIntervention = processing
+        withIntervention.phase = .waitingForInput
+        withIntervention.intervention = SessionIntervention(
+            id: "question-1",
+            kind: .question,
+            title: "需要补充信息",
+            message: "请选择环境",
+            options: [],
+            questions: [],
+            supportsSessionScope: false,
+            metadata: [:]
+        )
+        // Flag set and waitingForInput, but a pending question is not a completion.
+        XCTAssertFalse(SessionCompletionStateEvaluator.isCompletedReadySession(withIntervention))
+    }
+
     func testCompletedReadySessionRequiresWaitingForInputAssistantReply() {
         let session = SessionState(
             sessionId: "assistant-tail",

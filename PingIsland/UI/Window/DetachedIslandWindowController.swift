@@ -1984,18 +1984,17 @@ final class DetachedIslandWindowController: NSWindowController, NSWindowDelegate
         let isNewAttention = !newAttentionIds.subtracting(previousAttentionSoundIds).isEmpty
         let isNewCompletion = !completionDeltaIds.isEmpty
         let isNewTaskError = !errorDeltaIds.isEmpty
-        let isNewResourceLimit = !newResourceLimitIds.subtracting(previousResourceLimitIds).isEmpty
 
+        // Only chime on "agent stopped, your turn" edges: tool error, needs-approval/question,
+        // and completion. The ambient edges (processing started, context compaction) intentionally
+        // stay silent — they have no visible notification and were the source of hearing a sound
+        // with nothing on screen. Their id sets are still tracked below so priming stays correct.
         if isNewTaskError {
             playEventSoundIfNeeded(.taskError, sessions: errorSessions)
-        } else if isNewResourceLimit {
-            playEventSoundIfNeeded(.resourceLimit, sessions: resourceLimitedSessions)
         } else if isNewAttention {
             playEventSoundIfNeeded(.attentionRequired, sessions: attentionSessions)
         } else if isNewCompletion {
             playEventSoundIfNeeded(.taskCompleted, sessions: newlyCompletedSessions)
-        } else if !newProcessingIds.subtracting(previousProcessingIds).isEmpty {
-            playEventSoundIfNeeded(.processingStarted, sessions: processingSessions)
         }
 
         previousProcessingIds = newProcessingIds

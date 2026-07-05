@@ -900,6 +900,7 @@ stateDiagram-v2
 | `clientInfo` | `SessionClientInfo` | client/terminal/transport 中繼資料 |
 | `ingress` | `SessionIngress` | 事件來源管道(hookBridge/remoteBridge/codexAppServer/nativeRuntime/desktopAppMonitor) |
 | `phase` | `SessionPhase` | 目前狀態機階段 |
+| `assistantTurnCompleted` | `Bool` | 權威的「agent 停手、輪到使用者」完成訊號:`Stop` hook 把 session 落在 `.waitingForInput` 且無 intervention 時同步設 true,回到 active 時清除。存在原因是 Claude 的 assistant 回覆是在 `Stop→waitingForInput` 之後約 100ms+ 才從 transcript 解析進 `chatItems`,所以完成偵測不能靠「最後一個 chat item 是不是 assistant」;`SessionCompletionStateEvaluator.isCompletedReadySession` 以此旗標避開該競態 |
 | `intervention` | `SessionIntervention?` | 目前展示中的單一介入卡片 |
 | `pendingInterventions` | `[SessionIntervention]` | 佇列中尚未展示的介入 |
 | `codexParentThreadId` / `codexSubagentDepth` / `codexSubagentNickname` / `codexSubagentRole` | `String?` / `Int?` / `String?` / `String?` | Codex subagent 巢狀識別與顯示 |
@@ -1256,6 +1257,12 @@ flowchart TD
 - **結束的例外（保留提問）**：`shouldPreserveEndedStopForAnsweredQuestion`（line 498）= `status=="ended"` 且 `event=="Stop"` 且 `session.intervention?.awaitsExternalContinuation == true` 且 `clientInfo.prefersAnsweredQuestionFollowupAction`。命中時不轉 `.ended`，改成 `.waitingForInput`，讓等待外部續答的提問卡片留著。
 - **只有使用者封存會刪除**：事件面唯一從字典移除 session 的是 `archiveSession`（`.sessionArchived`）。
 - **背景 GC 是另一回事**：`sweepDeadOrEndedSessions`（liveness sweep，每 5s）會把 `.ended` 及 PID 已死的 session 一併移除。這與 AGENTS.md「ended 保留到使用者封存」的敘述在字面上有張力，見「棘手分支 / 地雷」。
+
+### 完成偵測訊號（`assistantTurnCompleted`）
+
+- `processHookEvent` 在套完 phase 後設/清 `session.assistantTurnCompleted`:phase 為 active（`processing`/`compacting`）時清為 false;否則若本事件是 `Stop`、`status != "ended"`、phase 落在 `.waitingForInput` 且無 intervention，就設 true。這是「agent 停手、輪到使用者」的權威完成訊號,同步發生在 `sessions[id] = session` 發布之前。
+- **為何需要**:Claude 的 assistant 回覆文字只從 transcript JSONL 解析（`processFileUpdate`），而 `Stop→waitingForInput` 是同步的、比回覆進 `chatItems` 早約 100ms+;idle 期間又沒有其他 parse 觸發,回覆常要等到下一次使用者互動才回填。若完成偵測靠「最後一個 chat item 是 assistant」，完成當下永遠不成立（trailing 是 user prompt 或背景 observation 工具），完成音與完成卡都不會觸發。旗標讓 `SessionCompletionStateEvaluator.isCompletedReadySession = intervention==nil && (waitingForInput || codexIdle) && (assistantTurnCompleted || hasCompletedAssistantReply)` 在 `Stop` 發布當下就成立。
+- Codex idle 完成走 `isCompletedCodexIdleSession`,不經此 hook 分支,旗標維持 false，沿用既有 `hasCompletedAssistantReply` 判斷,無回歸。
 
 ### 可見性規則（隱藏 vs 刪除是兩件事）
 

@@ -374,6 +374,12 @@ struct HoverSessionCard: View {
             // buttons, so tapping it must focus the terminal instead.
             guard opensOnTap || session.intervention?.isTerminalRoutedReminder == true else { return }
             activateSession()
+            // The terminal-routed reminder has no buttons to fire onActionCompleted, so tapping
+            // it must both focus the terminal and dismiss — otherwise the card lingers until the
+            // answer is written back. onActionCompleted is wired to close the panel/bubble.
+            if session.intervention?.isTerminalRoutedReminder == true {
+                onActionCompleted()
+            }
         }
         .onHover { isHovered = $0 }
     }

@@ -7,7 +7,12 @@
 
 import AppKit
 import Combine
+import os.log
 import SwiftUI
+
+// Lifecycle logging for the island. Read with:
+//   log stream --predicate 'subsystem == "com.wudanwu.pingisland" && category == "IslandUI"'
+let islandLog = Logger(subsystem: "com.wudanwu.pingisland", category: "IslandUI")
 
 enum NotchStatus: Equatable {
     case closed
@@ -772,9 +777,11 @@ class NotchViewModel: ObservableObject {
         hoverTimer = nil
 
         if reason == .notification && shouldSuppressAutomaticPresentation {
+            islandLog.info("notch open SUPPRESSED reason=notification (shouldSuppressAutomaticPresentation)")
             return
         }
 
+        islandLog.info("notch OPEN reason=\(String(describing: reason), privacy: .public)")
         openReason = reason
         status = .opened
         if case .instances = contentType {
@@ -863,6 +870,7 @@ class NotchViewModel: ObservableObject {
     }
 
     func notchClose() {
+        islandLog.info("notch CLOSE (openReason was \(String(describing: self.openReason), privacy: .public))")
         stopHoverCloseTimer()
         status = .closed
         currentChatSession = nil
@@ -872,6 +880,7 @@ class NotchViewModel: ObservableObject {
     }
 
     func beginDetachedPresentation(contentType: NotchContentType, playSound: Bool = true) {
+        islandLog.info("detached PRESENT content=\(String(describing: contentType), privacy: .public) playSound=\(playSound)")
         hoverTimer?.cancel()
         hoverTimer = nil
         detachmentLongPressWorkItem?.cancel()

@@ -7,6 +7,7 @@
 
 import AppKit
 import CoreGraphics
+import os.log
 import SwiftUI
 import os.log
 
@@ -873,10 +874,16 @@ struct NotchView: View {
             trigger: triggerForCurrentPresentation,
             style: .docked,
             activeCompletionNotification: activeCompletionNotification,
-            onAttentionActionCompleted: {},
+            onAttentionActionCompleted: { viewModel.notchClose() },
             onCompletionNotificationHoverChanged: handleCompletionNotificationHover,
             onDismissCompletionNotification: {
-                clearCompletionNotifications(keepPanelOpen: true)
+                // Tapping the completion card closes the panel (matching the 5s auto-dismiss,
+                // which passes closePanel:true) and marks the session seen so the feed does not
+                // immediately re-pop the same reply. detached already does the equivalent.
+                if let sessionId = activeCompletionNotification?.session.sessionId {
+                    sessionMonitor.markSessionSeen(sessionId: sessionId)
+                }
+                clearCompletionNotifications(keepPanelOpen: false)
             },
             onFeedHoverChanged: handleFeedBannerHover
         )
@@ -1686,18 +1693,17 @@ struct NotchView: View {
         let isNewAttention = !newAttentionIds.subtracting(previousAttentionSoundIds).isEmpty
         let isNewCompletion = !completionDeltaIds.isEmpty
         let isNewTaskError = !errorDeltaIds.isEmpty
-        let isNewResourceLimit = !newResourceLimitIds.subtracting(previousResourceLimitIds).isEmpty
 
+        // Only chime on "agent stopped, your turn" edges: tool error, needs-approval/question,
+        // and completion. The ambient edges (processing started, context compaction) intentionally
+        // stay silent — they have no visible notification and were the source of hearing a sound
+        // with nothing on screen. Their id sets are still tracked below so priming stays correct.
         if isNewTaskError {
             playEventSoundIfNeeded(.taskError, sessions: errorSessions)
-        } else if isNewResourceLimit {
-            playEventSoundIfNeeded(.resourceLimit, sessions: resourceLimitedSessions)
         } else if isNewAttention {
             playEventSoundIfNeeded(.attentionRequired, sessions: attentionSessions)
         } else if isNewCompletion {
             playEventSoundIfNeeded(.taskCompleted, sessions: newlyCompletedSessions)
-        } else if !newProcessingIds.subtracting(previousProcessingIds).isEmpty {
-            playEventSoundIfNeeded(.processingStarted, sessions: processingSessions)
         }
 
         previousProcessingIds = newProcessingIds
@@ -1716,6 +1722,8 @@ struct NotchView: View {
                 _ = await MainActor.run {
                     AppSettings.playSound(for: event)
                 }
+            } else {
+                islandLog.info("sound SUPPRESSED event=\(String(describing: event), privacy: .public) (session terminal focused) sessions=\(sessions.count)")
             }
         }
     }

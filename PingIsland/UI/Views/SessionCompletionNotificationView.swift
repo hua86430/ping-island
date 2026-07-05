@@ -123,7 +123,11 @@ enum SessionCompletionStateEvaluator {
         guard session.phase == .waitingForInput || isCompletedCodexIdleSession(session) else {
             return false
         }
-        return hasCompletedAssistantReply(for: session)
+        // `assistantTurnCompleted` is the authoritative Stop-driven turn-end signal.
+        // For Claude the assistant reply lands in chatItems only after the turn has
+        // already flipped to waitingForInput, so the last-chat-item heuristic below
+        // is unreliable at the completion moment; the flag closes that race.
+        return session.assistantTurnCompleted || hasCompletedAssistantReply(for: session)
     }
 
     private static func isCompletedCodexIdleSession(_ session: SessionState) -> Bool {

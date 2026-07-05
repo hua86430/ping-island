@@ -7,7 +7,9 @@
 
 import AppKit
 import Combine
+import CoreAudio
 import Foundation
+import os.log
 
 enum AppSettingsDefaultKeys {
     nonisolated static let surfaceMode = "surfaceMode"
@@ -2057,8 +2059,11 @@ enum AppSettings {
     }
 
     static func playSound(for event: NotificationEvent) {
-        guard soundEnabled, isSoundEnabled(for: event) else { return }
-        guard !areReminderNotificationsSuppressed else { return }
+        guard soundEnabled, isSoundEnabled(for: event), !areReminderNotificationsSuppressed else {
+            islandLog.info("sound BLOCKED event=\(String(describing: event), privacy: .public) soundEnabled=\(soundEnabled) perEvent=\(isSoundEnabled(for: event)) remindersSuppressed=\(areReminderNotificationsSuppressed)")
+            return
+        }
+        islandLog.info("sound PLAY event=\(String(describing: event), privacy: .public)")
 
         switch soundThemeMode {
         case .builtIn:
@@ -2084,11 +2089,32 @@ enum AppSettings {
 
     private static func playBundledSound(named resourceName: String) {
         guard let sound = bundledSoundCache[resourceName] ?? loadBundledSound(named: resourceName) else {
+            islandLog.info("bundledSound MISS name=\(resourceName, privacy: .public) (file not found / NSSound nil)")
             return
         }
 
         bundledSoundCache[resourceName] = sound
-        AppSoundPlayback.shared.play(sound, volume: Float(soundVolume))
+        let didPlay = AppSoundPlayback.shared.play(sound, volume: Float(soundVolume))
+        islandLog.info("bundledSound name=\(resourceName, privacy: .public) vol=\(soundVolume) didPlay=\(didPlay) isPlayingAfter=\(sound.isPlaying) defaultOut=\(currentDefaultOutputDeviceLabel(), privacy: .public)")
+    }
+
+    /// Diagnostic: the system default output device the sound will route to at play time.
+    private static func currentDefaultOutputDeviceLabel() -> String {
+        var addr = AudioObjectPropertyAddress(
+            mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var dev = AudioDeviceID(0)
+        var sz = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &addr, 0, nil, &sz, &dev) == noErr else { return "unknown" }
+        var nameAddr = AudioObjectPropertyAddress(
+            mSelector: kAudioObjectPropertyName,
+            mScope: kAudioObjectPropertyScopeGlobal,
+            mElement: kAudioObjectPropertyElementMain)
+        var cf: Unmanaged<CFString>? = nil
+        var nsz = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
+        guard AudioObjectGetPropertyData(dev, &nameAddr, 0, nil, &nsz, &cf) == noErr, let cf else { return "id=\(dev)" }
+        return cf.takeRetainedValue() as String
     }
 
     private static func loadBundledSound(named resourceName: String) -> NSSound? {

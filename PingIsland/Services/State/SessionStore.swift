@@ -673,6 +673,24 @@ actor SessionStore {
             session.lastNotifiableActivityAt = Date()
         }
 
+        // Turn-completion marker (consumed by SessionCompletionStateEvaluator).
+        // A Stop that settles the session at waitingForInput with no pending
+        // intervention is the authoritative "agent finished its turn" signal.
+        // Completion detection keys on this instead of waiting for the assistant
+        // reply to be parsed out of the transcript, which for Claude lands
+        // ~100ms+ after this synchronous phase flip — after the phase-transition
+        // edge the completion card keys on has already been consumed, and often
+        // behind trailing tool/observation items that defeat the last-chat-item
+        // heuristic. Cleared as soon as the session resumes active work.
+        if session.phase.isActive {
+            session.assistantTurnCompleted = false
+        } else if event.event == "Stop",
+                  event.status != "ended",
+                  session.phase == .waitingForInput,
+                  session.intervention == nil {
+            session.assistantTurnCompleted = true
+        }
+
         associateQoderChildSessionIfNeeded(sessionId: sessionId, event: event, session: &session)
         cancelOrphanedPendingHookResponse(
             previousPendingHookResponse,
