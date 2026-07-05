@@ -35,8 +35,8 @@
 - [x] 設定視窗原生化重寫（NavigationSplitView + macOS 26 Liquid Glass）— 已發 0.25.3
   - desc: 6900+ 行 `SettingsWindowView.swift` 單體檔重構為一檔一責模組（`PingIsland/UI/Views/Settings/`：SettingsRootView 殼 + SettingsSidebarView + SettingsDetailRouter + SettingsPanelViewModel + Components/ + Categories/ 十分類各一檔），搬移不改行為。視窗換原生 titled chrome（真紅綠燈／可拖／最小化／縮放、原生陰影），移除 popover 死碼。sidebar 扁平單行 + 彩色 icon + 原生選中高亮；chrome 改用原生 safe area + `hostingController.sizingOptions = []`（不 hardcode 位移／尺寸）。CI 用 macOS 26 SDK（release-unsigned.yml select Xcode 26）編 → macOS 26 上 sidebar 採 Liquid Glass；deployment target 維持 14。spec `docs/superpowers/specs/2026-07-03-settings-navigation-split-design.md`、plan `docs/superpowers/plans/2026-07-03-settings-navigation-split.md`；merge b3e8ef1、release d4bd7ac。build／unit／UI 全綠（Xcode 26 SDK）。
 
-- [ ] 簽章發版（release-packages.yml）補 Xcode 26 select — 未做
-  - desc: 目前只有 `release-unsigned.yml` 加了「Select Xcode 26」步驟。`release-packages.yml`（Developer ID + notarize、workflow_dispatch-only、tag 不觸發）仍是 macos-15 預設 Xcode 16，走簽章發版出的包在 macOS 26 上不會有 Liquid Glass。要比照補同樣 select 步驟。
+- [x] 簽章發版（release-packages.yml）補 Xcode 26 select — 已補（未實跑：workflow_dispatch-only 且需簽章密鑰）
+  - desc: `release-packages.yml` 的 macOS 簽章 job（`runs-on: macos-15`）在 checkout 後、簽章前，插入與 `release-unsigned.yml` 逐字相同的「Select Xcode 26」步驟（挑最新 `/Applications/Xcode_26*.app`、`sudo xcode-select -s`），讓 Developer ID + notarize 出的包也用 macOS 26 SDK build、有 Liquid Glass。build 步驟與 `scripts/build.sh`/`package-release.sh` 皆無 `DEVELOPER_DIR` 覆蓋，會沿用 select。YAML 通過 ruby 解析。未實跑：該 workflow 只能手動觸發且需簽章密鑰，SKILL 明訂非必要不跑 notarize。
 
 - [x] macOS 26 SDK 全 app 外觀掃查 — 使用者確認 OK
 

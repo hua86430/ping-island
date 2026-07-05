@@ -108,6 +108,23 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
+      - name: Select Xcode 26 (macOS 26 SDK for Liquid Glass)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The settings window's Liquid Glass appearance is only produced when the
+          # app is built against the macOS 26 SDK, which ships with Xcode 26. The
+          # macos-15 image's default Xcode is 16.x, so select the newest Xcode 26.
+          xc=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1 || true)
+          if [ -z "$xc" ]; then
+            echo "::error::No Xcode 26 found on runner. Available Xcodes:"
+            ls -d /Applications/Xcode_*.app 2>/dev/null || echo "(none)"
+            exit 1
+          fi
+          sudo xcode-select -s "$xc/Contents/Developer"
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i macos || true
+
       - name: Validate release signing secrets
         id: validate
         env:
