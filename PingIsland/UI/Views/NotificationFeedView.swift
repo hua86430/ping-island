@@ -48,7 +48,6 @@ struct NotificationFeedView: View {
                             Capsule().fill(Color.white.opacity(clearAllHovered ? 0.12 : 0.0))
                         )
                         .contentShape(Capsule())
-                        .pointerCursor()
                         .onHover { hovering in
                             clearAllHovered = hovering
                         }
@@ -167,7 +166,6 @@ private struct NotificationFeedRow: View {
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 8)
-        .pointerCursor()
         .onHover { hovering in
             isHovered = hovering
         }
@@ -192,50 +190,11 @@ private struct NotificationFeedRow: View {
     }
 }
 
-// MARK: - Pointer cursor inside the notch panel
-
-extension View {
-    /// Shows the pointing-hand cursor while hovering, working inside the notch
-    /// panel where `.onHover` + `NSCursor.push()` does not: `NotchPanel` is a
-    /// borderless non-activating `NSPanel`, and feed banners open it with the
-    /// window left non-key / the app non-active (see NotchWindowController's
-    /// `openReason != .notification` guard). A pushed cursor gets reset by the
-    /// window's cursor-rect management on the next mouse move. An AppKit
-    /// tracking area with `.cursorUpdate` + `.activeAlways` sets the cursor on
-    /// the cursorUpdate event instead, which survives redraws and does not
-    /// depend on the panel being active.
-    func pointerCursor() -> some View {
-        overlay(PointerCursorArea().allowsHitTesting(false))
-    }
-}
-
-private struct PointerCursorArea: NSViewRepresentable {
-    func makeNSView(context: Context) -> NSView { PointerCursorNSView() }
-    func updateNSView(_ nsView: NSView, context: Context) {}
-}
-
-private final class PointerCursorNSView: NSView {
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(NSTrackingArea(
-            rect: .zero,
-            options: [.cursorUpdate, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-            owner: self,
-            userInfo: nil
-        ))
-    }
-
-    override func cursorUpdate(with event: NSEvent) {
-        NSCursor.pointingHand.set()
-    }
-
-    // cursorUpdate can be skipped if the panel isn't active; set on enter too.
-    override func mouseEntered(with event: NSEvent) {
-        NSCursor.pointingHand.set()
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        NSCursor.arrow.set()
-    }
-}
+// Pointer-cursor-on-hover was removed: the notch panel is a non-activating,
+// non-key NSPanel, so on macOS 26 neither NSCursor.set() (ignored while the app
+// is inactive) nor cursorUpdate (no longer delivered to a non-key panel) can
+// change the system cursor from here. It worked on macOS 15 because cursorUpdate
+// still fired for the non-key panel. Making it work would require activating the
+// app / making the panel key on hover, which would steal the user's keyboard
+// focus — not acceptable for a passive hover. See git history for the prior
+// tracking-area attempt.

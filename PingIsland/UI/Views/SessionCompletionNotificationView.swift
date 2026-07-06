@@ -522,9 +522,12 @@ struct SessionCompletionNotificationView: View {
         .onDisappear {
             onHoverChanged(false)
         }
-        .onTapGesture {
-            onDismiss()
-        }
+        // simultaneousGesture (not onTapGesture): the panel body embeds a ScrollView
+        // for the reply, and a plain parent onTapGesture loses to that ScrollView for
+        // taps landing inside it — so only the non-scrolling header strip dismissed.
+        // A simultaneous TapGesture is recognized alongside the scroll drag, so a tap
+        // anywhere on the card dismisses while vertical drags still scroll.
+        .simultaneousGesture(TapGesture().onEnded { onDismiss() })
     }
 }
 
