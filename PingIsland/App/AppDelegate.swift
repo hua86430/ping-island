@@ -6,6 +6,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowManager: WindowManager?
     private var screenObserver: ScreenObserver?
     private var statusBarController: StatusBarController?
+#if DEBUG
+    private let debugCardInjector = DebugCardInjector()
+#endif
     private let launchConfiguration = AppLaunchConfiguration()
     private let startupSessionMonitor = SessionMonitor()
     private let globalShortcutManager = GlobalShortcutManager.shared
@@ -59,6 +62,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if !launchConfiguration.isRunningTests {
             statusBarController = StatusBarController()
         }
+#if DEBUG
+        if !launchConfiguration.isRunningTests {
+            debugCardInjector.start()
+        }
+#endif
 
         let launchFlow = AppLaunchFlow(
             configuration: launchConfiguration,

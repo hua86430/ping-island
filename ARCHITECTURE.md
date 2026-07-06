@@ -10,7 +10,7 @@
 
 這份文件的存在前提是「改 code 就改 doc」。契約如下：
 
-- **覆蓋率 metric = 檔案級 100%**。每個 production source `.swift` 檔都必須被某一章記載其責任與關鍵型別，並出現在「附錄 B 檔案覆蓋矩陣」。分母是 177 個檔（`PingIsland/` 157 + `Prototype/Sources/` 20）。`Prototype/Tests/` 的 12 個測試檔不計入（測試不是架構，其涵蓋範圍在 §15 概述）。
+- **覆蓋率 metric = 檔案級 100%**。每個 production source `.swift` 檔都必須被某一章記載其責任與關鍵型別，並出現在「附錄 B 檔案覆蓋矩陣」。分母是 180 個檔（`PingIsland/` 160 + `Prototype/Sources/` 20）。`Prototype/Tests/` 的 12 個測試檔不計入（測試不是架構，其涵蓋範圍在 §15 概述）。
 - **粒度刻意停在檔案／型別／流程級，不逐 if/else**。行級細節看 code；文件記的是「改介面或改流程才需要動」的結構。流程用 mermaid，規則與資料契約用散文加表格。這是為了讓文件維護得動——逐行複製 code 的文件一次 commit 就死。
 - **只要 code 或架構有改，`ARCHITECTURE.md` 就一起改** — code change 沒改到 doc 就不算完成。這是以「每次改 code」為單位，不綁 PR 或 commit 邊界：改到的檔 → 更新對應章的敘述與圖；新增檔 → 加進附錄 B 矩陣並歸入某章；刪檔 → 移除矩陣列與相關敘述；改跨子系統流程 → 更新「跨切面流程索引」與相關章的圖。
 - **docs-first 開發要把 doc 更新寫進 plan**：本專案常用 superpowers（`brainstorming` → `writing-plans`，spec/plan 放 `docs/superpowers/`）先寫文件再開發。當 spec/plan 描述某個 code change 時，那份 plan 必須把「更新 `ARCHITECTURE.md` 與覆蓋矩陣」列成明確 task／步驟 — doc 更新是工作項的一部分，跟著實作一起出，不落後。
@@ -110,7 +110,7 @@ flowchart TB
 15. §15 Prototype / IslandBridge — 統一 hook entrypoint、context 捕捉、envelope 契約、測試涵蓋
 
 附錄 A：已知不一致與孤兒碼（掃描期觀察）
-附錄 B：檔案覆蓋矩陣（177 檔逐檔對應章節）
+附錄 B：檔案覆蓋矩陣（180 檔逐檔對應章節）
 
 ---
 ## §01 App 與呈現編排
@@ -133,6 +133,7 @@ flowchart TB
 
 - `PingIslandApp`（`@main`）→ SwiftUI `App`。只做兩件事：用 `@NSApplicationDelegateAdaptor` 掛上 `AppDelegate`，並宣告一個 SwiftUI `Settings` scene（承載 `SettingsWindowView`，注入 `settings.locale`）。真正的 runtime 全在 `AppDelegate`。
 - `AppDelegate`（`@MainActor`）→ 生命週期中樞。持有 `WindowManager`、`ScreenObserver`、`StatusBarController`、`AppLaunchConfiguration`、一個啟動期 `SessionMonitor`、`GlobalShortcutManager.shared`；用兩個 bool 旗標（`shouldPresentSettingsAfterOnboarding`、`shouldRunHookWalkthroughAfterOnboarding`）串接 onboarding 後續動作。啟動時（非測試）建立常駐 `StatusBarController`。
+- `DebugCardInjector`（`#if DEBUG`, `final`）→ 測試用卡片召喚器,繞開真 session 生命週期與完成 policy 直接把卡叫出來。1s Timer 輪詢 `/tmp/pingisland-debug-inject`,內容 `completion`/`question` 分別 post `.pingIslandDebugInjectCompletion` / `.pingIslandDebugInjectQuestion`。`NotchView`（`#if DEBUG` onReceive）收到後:完成卡直接 set `activeCompletionNotification` + 開窗,繞過 policy/blocker/queue 立即呈現;問題卡呼叫 `SessionStore.debugInjectQuestionCard()`(`#if DEBUG`,在最近真 session 掛合成 `.question` intervention 後 `publishState()`)。兩者皆重用最近的真 session 以取得真實終端識別符;`AppDelegate` 啟動時（非測試、`#if DEBUG`）啟動它。release build 完全不含。
 - `StatusBarController`（`@MainActor`, `final`）→ 常駐選單列狀態項（`NSStatusItem` + `NSMenu`），accessory app 進設定的逃生口。選單版面由純函式 `StatusBarMenuBuilder.menu(...)` 產生（開啟設定 / 展示模式 submenu 附 checkmark / 版本資訊行 / 檢查更新（App Store 建置隱藏）/ 離開），只寫 `AppSettings.surfaceMode` 交由 coordinator 的 `$surfaceMode` sink 套用；`menuWillOpen` 重建選單刷新 checkmark 與版本行。檢查更新用階段機訂閱 `UpdateManager.$state` + `NSAlert` 小視窗回報(最新 / 發現新版·安裝 / 錯誤),不開設定 GUI。狀態項圖示由 `AppSettings.menuBarIconStyle` 決定,`$menuBarIconStyle` sink 即時換圖。純建構器與 `StatusMenuItem` / `StatusMenuAction` 值型別可單測（`StatusBarMenuBuilderTests`）。
 - `MenuBarIconStyle`（`String` enum, `CaseIterable`）→ 可切換的選單列圖示樣式(瀏海三點 / 實心島鏤空 / 程式碼火花 / 指令泡泡 / 游標火花)。每個 case 對應 `Assets.xcassets` 內一個 template imageset(單色向量,`preserves-vector-representation` + template 染色,原始 SVG 收在 `design/menubar-icons/`),`templateImage(pointSize:)` 載入並複製快取影像設成 template。選擇持久化在 `AppSettings.menuBarIconStyle`,Settings「顯示 > 選單列圖示」的 `MenuBarIconStylePicker` 提供預覽切換。可單測（`MenuBarIconStyleTests`)。
 - `AppLaunchConfiguration`（`struct`, `Equatable`）→ 純環境變數解析：把 XCTest / UI test / 環境旗標映射成「這次啟動該不該裝整合、建視窗、觀察螢幕、強制單實例、開設定視窗」以及 activation policy。無副作用，可測。
@@ -3375,3 +3376,4 @@ CLAUDE.md 指出這裡是「最快做 logic-level 單測」的地方；bridge-fo
 | 177 | `Prototype/Sources/IslandShared/Models.swift` | §15 Prototype / IslandBridge |
 | 178 | `PingIsland/App/StatusBarController.swift` | §01 App 與呈現編排 |
 | 179 | `PingIsland/App/MenuBarIconStyle.swift` | §01 App 與呈現編排 |
+| 180 | `PingIsland/App/DebugCardInjector.swift` | §01 App 與呈現編排 |

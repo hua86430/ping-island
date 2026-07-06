@@ -3311,6 +3311,47 @@ actor SessionStore {
         sessionsSubject.send(sortedSessions)
     }
 
+#if DEBUG
+    /// Debug-only: attach a synthetic question intervention to the newest real
+    /// session (reusing its terminal identifiers) or a synthetic one, then publish,
+    /// so the question/selection card renders through the normal pipeline. See
+    /// DebugCardInjector for how this is triggered.
+    func debugInjectQuestionCard() {
+        var session = debugTargetSession()
+        session.phase = .waitingForInput
+        session.assistantTurnCompleted = false
+        session.intervention = SessionIntervention(
+            id: "debug-question-\(Int(Date().timeIntervalSince1970))",
+            kind: .question,
+            title: "[debug] 測試問題卡",
+            message: "這是一張合成的提問卡,用來測試點擊與作答路徑。",
+            options: [],
+            questions: [],
+            supportsSessionScope: false,
+            metadata: [:]
+        )
+        session.lastActivity = Date()
+        session.lastNotifiableActivityAt = Date()
+        sessions[session.sessionId] = session
+        publishState()
+    }
+
+    /// Newest non-ended session (real terminal identifiers) or a minimal synthetic one.
+    private func debugTargetSession() -> SessionState {
+        if let existing = sessions.values
+            .filter({ $0.phase != .ended })
+            .max(by: { $0.lastActivity < $1.lastActivity }) {
+            return existing
+        }
+        return SessionState(
+            sessionId: "debug-\(Int(Date().timeIntervalSince1970))",
+            cwd: "/tmp/debug-session",
+            provider: .claude,
+            phase: .idle
+        )
+    }
+#endif
+
     // MARK: - Queries
 
     /// Get a specific session

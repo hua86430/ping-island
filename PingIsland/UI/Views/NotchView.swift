@@ -447,6 +447,14 @@ struct NotchView: View {
                 handleCompletionNotificationChange(instances)
                 handleFeedUnreadChange(instances)
             }
+#if DEBUG
+            .onReceive(NotificationCenter.default.publisher(for: .pingIslandDebugInjectCompletion)) { _ in
+                debugPresentCompletionCard()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .pingIslandDebugInjectQuestion)) { _ in
+                Task { await SessionStore.shared.debugInjectQuestionCard() }
+            }
+#endif
     }
 
     private var visibilityAwareBody: some View {
@@ -1402,6 +1410,30 @@ struct NotchView: View {
 
         completionNotificationQueue.append(notification)
     }
+
+#if DEBUG
+    /// Debug-only: present a completion card immediately, bypassing the completion
+    /// policy (recency, active-session blocker, queue) so a card can be summoned for
+    /// interaction testing regardless of what else is running. Reuses the newest real
+    /// session (genuine terminal identifiers) or a synthetic one. Triggered via
+    /// DebugCardInjector (`echo completion > /tmp/pingisland-debug-inject`).
+    private func debugPresentCompletionCard() {
+        let session = sessionMonitor.instances.first(where: { $0.phase != .ended })
+            ?? SessionState(
+                sessionId: "debug-\(Int(Date().timeIntervalSince1970))",
+                cwd: "/tmp/debug-session",
+                provider: .claude,
+                phase: .waitingForInput
+            )
+        let notification = SessionCompletionNotification(session: session, kind: .completed)
+        activeCompletionNotification = notification
+        shouldDismissCompletionNotificationOnHoverExit = false
+        if viewModel.status != .opened || viewModel.openReason != .notification {
+            viewModel.notchOpen(reason: .notification)
+        }
+        scheduleCompletionNotificationDismissal(for: notification.id)
+    }
+#endif
 
     private func maybePresentNextCompletionNotification() {
         guard !areReminderNotificationsSuppressed else { return }
